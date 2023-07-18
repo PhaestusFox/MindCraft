@@ -38,10 +38,10 @@ pub fn make_test_block_mesh(
     let y = block_index / atlas_size;
     let x = block_index - y * atlas_size;
     let uv_off = 1.0 / atlas_size as f32;
-    let uv_x_0 = -0.1 +  x as f32 * uv_off;
-    let uv_x_1 = 0.1 + (x as f32 + 0.99)  * uv_off;
-    let uv_y_0 = -0.1 +  y as f32 * uv_off;
-    let uv_y_1 = 0.1 + (y as f32 + 0.99)  * uv_off;
+    let uv_x_0 =  x as f32 * uv_off;
+    let uv_x_1 = (x as f32 + 0.99)  * uv_off;
+    let uv_y_0 =  y as f32 * uv_off;
+    let uv_y_1 = (y as f32 + 0.99)  * uv_off;
     let mut uvs = Vec::with_capacity(24);
     for _ in 0..6 {
         uvs.extend([
