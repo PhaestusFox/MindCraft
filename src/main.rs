@@ -14,6 +14,8 @@ mod blocks;
 
 mod cam;
 
+mod components;
+
 fn main() {
     let mut app = App::new();
     app.add_plugins((DefaultPlugins, EditorPlugin::default(), RapierPhysicsPlugin::<()>::default()));
@@ -55,10 +57,12 @@ fn spawn_cube(
         BlockType::IronOre,
         BlockType::CoalOre,
         BlockType::DeadBush,
+        BlockType::Grass,
     ].into_iter()));
+
     commands.spawn(PbrBundle {
         mesh: mesh.add(blocks::make_test_block_mesh(4, 3)),
-        material: atlas.get(),
+        material: atlas.get_atlas(),
         ..Default::default()
     });
 }
@@ -66,8 +70,9 @@ fn spawn_cube(
 fn gen_chunk_mesh(
     mut chunks: Query<(&Chunk, &mut Handle<Mesh>), Changed<Chunk>>,
     mut meshs: ResMut<Assets<Mesh>>,
+    atlas: Res<TextureHandels>,
 ) {
     for (chunk, mut handle) in &mut chunks {
-        *handle = meshs.add(chunk.gen_mesh());
+        *handle = meshs.add(chunk.gen_mesh(&atlas));
     }
 }

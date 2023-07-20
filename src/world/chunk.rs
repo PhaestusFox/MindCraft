@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use rand::{Rng, SeedableRng};
 use strum::IntoEnumIterator;
-use bevy::{prelude::*, render::mesh::Indices};
+use bevy::{prelude::*, render::mesh::Indices, utils::HashMap};
 use noise::NoiseFn;
 
 #[derive(Component)]
@@ -38,11 +38,11 @@ impl Chunk {
         self.0[(pos.y * CHUNK_ARIA + pos.z * CHUNK_SIZE + pos.x) as usize]
     }
 
-    pub fn gen_mesh(&self) -> Mesh {
+    pub fn gen_mesh(&self, atlas_map: &TextureHandels) -> Mesh {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
-        let mut normals = Vec::new();
+        let mut color: Vec<[f32; 4]> = Vec::new();
         let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList);
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE{
@@ -51,16 +51,16 @@ impl Chunk {
                     let block = self.get_block(current);
                     if let BlockType::Air = block {continue;}
                     for direction in Direction::iter() {
+                        let block = block.gen_mesh(direction, atlas_map);
                         if let BlockType::Air = self.get_block(current.get(direction)) {
-                            indices.extend(get_indices(positions.len() as u32));
-                            positions.extend(gen_face(direction).map(|mut pos| {
-                                pos[0] += x as f32;
-                                pos[1] += y as f32;
-                                pos[2] += z as f32;
-                                pos
+                            indices.extend(block.indeces.into_iter().map(|i| *i + positions.len() as u32));
+                            positions.extend(block.pos.into_iter().map(|pos| {
+                                [pos[0] + x as f32,
+                                 pos[1] + y as f32,
+                                 pos[2] + z as f32,]
                             }));
-                            uvs.extend(get_uv(block as usize - 1, 3));
-                            normals.extend([[0., 1., 0.]; 4]);
+                            uvs.extend(block.uv.into_iter());
+                            color.extend(block.color.into_iter());
                         }
                     }
                 }
@@ -68,8 +68,8 @@ impl Chunk {
         }
         mesh.set_indices(Some(Indices::U32(indices)));
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, color);
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
         mesh
     }
 }

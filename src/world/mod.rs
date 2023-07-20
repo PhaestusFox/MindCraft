@@ -36,7 +36,7 @@ pub fn gen_start_chunks(
             for x in 0..5 {
                 commands.spawn((PbrBundle {
                     transform: Transform::from_translation(Vec3::new((x * CHUNK_SIZE) as f32, (y * CHUNK_SIZE) as f32, (z * CHUNK_SIZE) as f32)),
-                    material: matt.get(),
+                    material: matt.get_atlas(),
                     ..Default::default()
                 }, chunk::Chunk::new(chunk::Position::new(x, y, z), &world_descriptior.rng, world_descriptior.seed)));
             }
@@ -62,7 +62,7 @@ pub fn gen_view_chunks(
                 let pos = Position::new(center.x + x, y, center.z + z);
                 commands.spawn((PbrBundle {
                     transform: Transform::from_translation(Vec3::new((pos.x * CHUNK_SIZE) as f32, (pos.y * CHUNK_SIZE) as f32, (pos.z * CHUNK_SIZE) as f32)),
-                    material: matt.get(),
+                    material: matt.get_atlas(),
                     ..Default::default()
                 }, chunk::Chunk::new(pos, &world_descriptior.rng, world_descriptior.seed)));
             }

@@ -1,4 +1,5 @@
-use bevy::{prelude::*, ecs::system::Command};
+use bevy::{prelude::*, ecs::system::Command, utils::HashMap};
+use indexmap::IndexSet;
 
 use crate::blocks::BlockType;
 
@@ -12,7 +13,7 @@ impl Plugin for TexturePlugin {
 }
 
 #[derive(Resource)]
-struct TextureAtlasBuilder(Vec<Handle<Image>>);
+struct TextureAtlasBuilder(IndexSet<Handle<Image>>);
 
 pub struct MakeTextureAtlas(Vec<BlockType>);
 impl MakeTextureAtlas {
@@ -22,23 +23,44 @@ impl MakeTextureAtlas {
 }
 impl Command for MakeTextureAtlas {
     fn apply(self, world: &mut World) {
-        let mut need_textures = Vec::with_capacity(self.0.len());
+        let mut need_textures = IndexSet::with_capacity(self.0.len());
+        let mut map = HashMap::with_capacity(self.0.len());
         let asset_server = world.resource::<AssetServer>();
         for block in self.0 {
             for path in block.get_texture_paths() {
-                need_textures.push(asset_server.load::<_, &str>(path));
+                let handle = asset_server.load::<_, &str>(path);
+                let temp = handle.clone_weak();
+                need_textures.insert(handle);
+                let map: &mut Vec<usize> = map.entry(block).or_default();
+                map.push(need_textures.get_index_of(&temp).unwrap());
             }
         }
+        let _ = std::mem::replace(&mut world.resource_mut::<TextureHandels>().block_map, map);
+        world.resource_mut::<TextureHandels>().len = (need_textures.len() as f32).sqrt().ceil() as usize;
         world.insert_resource(TextureAtlasBuilder(need_textures));
     }
 }
 
 #[derive(Resource)]
-pub struct TextureHandels(Handle<StandardMaterial>);
+pub struct TextureHandels{
+    atlas: Handle<StandardMaterial>,
+    block_map: HashMap<BlockType, Vec<usize>>,
+    len: usize,
+}
 
 impl TextureHandels {
-    pub fn get(&self) -> Handle<StandardMaterial> {
-        self.0.clone()
+    pub fn get_atlas(&self) -> Handle<StandardMaterial> {
+        self.atlas.clone()
+    }
+    pub fn get_indexs(&self, block: &BlockType) -> &[usize] {
+        if let Some(i) = self.block_map.get(block) {
+            i
+        } else {
+            &[]
+        }
+    }
+    pub fn len(&self) -> usize {
+        self.len
     }
 }
 
@@ -52,7 +74,11 @@ impl FromWorld for TextureHandels {
             alpha_mode: AlphaMode::Mask(0.1),
             ..Default::default()
         });
-        TextureHandels(texture)
+        TextureHandels{
+            atlas: texture,
+            block_map: HashMap::new(),
+            len: 0,
+        }
     }
 }
 
@@ -75,7 +101,7 @@ fn build_texture_atlas(
     let mut atlas_data = vec![0; (atlas_size * atlas_size * width * width * pixed_size) as usize];
     'y: for y in 0..atlas_size {
         for x in 0..atlas_size {
-            let Some(handle) = atlas_builder.0.get(y * atlas_size + x) else {break 'y;};
+            let Some(handle) = atlas_builder.0.get_index(y * atlas_size + x) else {break 'y;};
             let Some(image) = images.get(handle) else {continue;};
             fill_from(&mut atlas_data, x, y, atlas_size, width, &image.data, pixed_size);
         }
