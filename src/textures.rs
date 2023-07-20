@@ -47,6 +47,9 @@ impl FromWorld for TextureHandels {
         let main_image = world.resource_mut::<Assets<Image>>().get_handle("MainAtlas");
         let texture = world.resource_mut::<Assets<StandardMaterial>>().add(StandardMaterial {
             base_color_texture: Some(main_image),
+            metallic: 0.,
+            reflectance: 0.,
+            alpha_mode: AlphaMode::Mask(0.1),
             ..Default::default()
         });
         TextureHandels(texture)

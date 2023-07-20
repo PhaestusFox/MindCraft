@@ -1,6 +1,8 @@
 use bevy::{prelude::*, render::mesh::VertexAttributeValues};
 
+#[derive(Debug, Default, Clone, Copy, strum_macros::EnumIter)]
 pub enum BlockType {
+    #[default]
     Air,
     Bedrock,
     Gravel,
@@ -38,10 +40,10 @@ pub fn make_test_block_mesh(
     let y = block_index / atlas_size;
     let x = block_index - y * atlas_size;
     let uv_off = 1.0 / atlas_size as f32;
-    let uv_x_0 =  x as f32 * uv_off;
-    let uv_x_1 = (x as f32 + 0.99)  * uv_off;
-    let uv_y_0 =  y as f32 * uv_off;
-    let uv_y_1 = (y as f32 + 0.99)  * uv_off;
+    let uv_x_0 = (x as f32 + 0.02) * uv_off;
+    let uv_x_1 = (x as f32 + 0.98) * uv_off;
+    let uv_y_0 = (y as f32 + 0.02) * uv_off;
+    let uv_y_1 = (y as f32 + 0.98) * uv_off;
     let mut uvs = Vec::with_capacity(24);
     for _ in 0..6 {
         uvs.extend([
@@ -61,52 +63,70 @@ pub fn make_test_block_mesh(
 fn get_test_indices() -> Vec<u16> {
     vec![
         0,1,2,2,3,0,
-        6,5,4,4,7,6,
+        4,5,6,6,7,4,
         8,9,10,10,11,8,
-        14,13,12,12,15,14,
-        18,17,16,16,19,18,
+        12,13,14,14,15,12,
+        16,17,18,18,19,16,
         20,21,22,22,23,20
     ]
 }
 
 fn get_test_vertexes() -> Vec<[f32; 3]> {
-    const side_length: f32 = 1.0;
-    const half_length: f32 = side_length / 2.0;
+    const SIZE_LENGTH: f32 = 1.0;
+    const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
     vec![
         // Front face
-        [-half_length, -half_length, half_length],   // 0
-        [half_length, -half_length, half_length],    // 1
-        [half_length, half_length, half_length],     // 2
-        [-half_length, half_length, half_length],    // 3
+        [-HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],   // 0
+        [HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],    // 1
+        [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 2
+        [-HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],    // 3
 
         // Back face
-        [-half_length, -half_length, -half_length],  // 4
-        [half_length, -half_length, -half_length],   // 5
-        [half_length, half_length, -half_length],    // 6
-        [-half_length, half_length, -half_length],   // 7
+        [HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],    // 4
+        [HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],   // 5
+        [-HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],  // 6
+        [-HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],   // 7
 
         // Left face
-        [-half_length, -half_length, -half_length],  // 8
-        [-half_length, -half_length, half_length],   // 9
-        [-half_length, half_length, half_length],    // 10
-        [-half_length, half_length, -half_length],   // 11
+        [-HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],  // 8
+        [-HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],   // 9
+        [-HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],    // 10
+        [-HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],   // 11
 
         // Right face
-        [half_length, -half_length, -half_length],   // 12
-        [half_length, -half_length, half_length],    // 13
-        [half_length, half_length, half_length],     // 14
-        [half_length, half_length, -half_length],    // 15
+        [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 12
+        [HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],    // 13
+        [HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],   // 14
+        [HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],    // 15
 
         // Top face
-        [-half_length, half_length, -half_length],   // 16
-        [half_length, half_length, -half_length],    // 17
-        [half_length, half_length, half_length],     // 18
-        [-half_length, half_length, half_length],    // 19
+        [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 16
+        [HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],    // 17
+        [-HALF_LENGTH, HALF_LENGTH, -HALF_LENGTH],   // 18
+        [-HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],    // 19
 
         // Bottom face
-        [-half_length, -half_length, -half_length],  // 20
-        [half_length, -half_length, -half_length],   // 21
-        [half_length, -half_length, half_length],    // 22
-        [-half_length, -half_length, half_length],   // 23
+        [-HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],  // 20
+        [HALF_LENGTH, -HALF_LENGTH, -HALF_LENGTH],   // 21
+        [HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],    // 22
+        [-HALF_LENGTH, -HALF_LENGTH, HALF_LENGTH],   // 23
     ]
+}
+
+impl rand::prelude::Distribution<BlockType> for BlockType {
+    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> BlockType {
+        // match rng.gen_range(0, 3) { // rand 0.5, 0.6, 0.7
+        match rng.gen_range(0..=8) { // rand 0.8
+            0 => BlockType::Bedrock,
+            1 => BlockType::Gravel,
+            2 => BlockType::Sand,
+            3 => BlockType::Dirt,
+            4 => BlockType::Stone,
+            5 => BlockType::GoldOre,
+            6 => BlockType::IronOre,
+            7 => BlockType::CoalOre,
+            8 => BlockType::DeadBush,
+            _ => BlockType::Air,
+        }
+    }
 }

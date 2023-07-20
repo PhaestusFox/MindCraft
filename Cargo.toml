@@ -9,3 +9,7 @@ edition = "2021"
 bevy = "0.11"
 bevy_editor_pls = {git = "https://github.com/jakobhellermann/bevy_editor_pls.git"}
 bevy_rapier3d = { version = "*", features = [ "simd-stable", "debug-render-2d" ] }
+rand = "*"
+strum_macros = "*"
+strum = "*"
+noise = "*"
