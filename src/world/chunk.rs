@@ -133,7 +133,7 @@ fn get_uv(block: usize, atlas_size: usize) -> [[f32;2]; 4] {
 
 
 #[derive(Debug, strum_macros::EnumIter, Clone, Copy, PartialEq)]
-enum Direction {
+pub enum Direction {
     Up,
     Down,
     Left,
@@ -156,10 +156,10 @@ const fn gen_face(direction: Direction) -> [[f32; 3]; 4] {
         ],
         Direction::Back => [
             // Back face
-            [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],    // 4
-            [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],   // 5
-            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],  // 6
-            [NEG_HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],   // 7
+            [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],   // 4
+            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],  // 5
+            [NEG_HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],   // 6
+            [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],    // 7
         ],
         Direction::Left => [
             // Left face
@@ -170,10 +170,10 @@ const fn gen_face(direction: Direction) -> [[f32; 3]; 4] {
         ],
         Direction::Right => [
             // Right face
-            [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 12
-            [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],    // 13
-            [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],   // 14
-            [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],    // 15
+            [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],    // 12
+            [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH],   // 13
+            [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],    // 14
+            [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 15
         ],
         Direction::Up => [
             // Top face
