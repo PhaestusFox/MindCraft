@@ -24,7 +24,7 @@ impl WorldDescriptior {
 }
 
 #[derive(Debug, Resource, Default)]
-pub struct Map(HashSet<Position>);
+pub struct Map(HashSet<ChunkId>);
 
 pub fn gen_start_chunks(
     mut commands: Commands,
@@ -38,7 +38,7 @@ pub fn gen_start_chunks(
                     transform: Transform::from_translation(Vec3::new((x * CHUNK_SIZE) as f32, (y * CHUNK_SIZE) as f32, (z * CHUNK_SIZE) as f32)),
                     material: matt.get_atlas(),
                     ..Default::default()
-                }, chunk::Chunk::new(chunk::Position::new(x, y, z), &world_descriptior.rng, world_descriptior.seed)));
+                }, chunk::Chunk::new(ChunkId::new(x, y, z), &world_descriptior.rng, world_descriptior.seed)));
             }
         }
     }
@@ -52,16 +52,16 @@ pub fn gen_view_chunks(
     matt: Res<TextureHandels>,
 ) {
     let player = player.single().translation;
-    let center = Position::new((player.x / CHUNK_SIZE as f32) as isize, 0, (player.z / CHUNK_SIZE as f32) as isize);
+    let center = ChunkId::new((player.x / CHUNK_SIZE as f32) as i32, 0, (player.z / CHUNK_SIZE as f32) as i32);
     for z in -5..5 {
         for x in -5..5 {
-            let pos = Position::new(center.x + x, 0, center.z + z);
+            let pos = ChunkId::new(center.x() + x, 0, center.z() + z);
             if map.0.contains(&pos) {continue;}
             map.0.insert(pos);
             for y in 0..5 {
-                let pos = Position::new(center.x + x, y, center.z + z);
+                let pos = ChunkId::new(center.x() + x, y, center.z() + z);
                 commands.spawn((PbrBundle {
-                    transform: Transform::from_translation(Vec3::new((pos.x * CHUNK_SIZE) as f32, (pos.y * CHUNK_SIZE) as f32, (pos.z * CHUNK_SIZE) as f32)),
+                    transform: Transform::from_translation(Vec3::new((pos.x() * CHUNK_SIZE) as f32, (pos.y() * CHUNK_SIZE) as f32, (pos.z() * CHUNK_SIZE) as f32)),
                     material: matt.get_atlas(),
                     ..Default::default()
                 }, chunk::Chunk::new(pos, &world_descriptior.rng, world_descriptior.seed)));

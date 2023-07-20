@@ -8,7 +8,7 @@ use noise::NoiseFn;
 pub struct Chunk([BlockType; CHUNK_VOL as usize]);
 
 impl Chunk {
-    pub fn new(pos: Position, noise: &noise::Fbm<noise::SuperSimplex>, seed: u64) -> Chunk {
+    pub fn new(pos: ChunkId, noise: &noise::Fbm<noise::SuperSimplex>, seed: u64) -> Chunk {
         use rand::distributions::Distribution;
         let mut chunk = [BlockType::Air; CHUNK_VOL as usize];
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
@@ -16,13 +16,13 @@ impl Chunk {
         let mut max = f64::MIN;
         for z in 0..CHUNK_SIZE{
             for x in 0..CHUNK_SIZE {
-                let current_hight = pos.y * CHUNK_SIZE;
-                let current_x = pos.x * CHUNK_SIZE + x;
-                let current_z = pos.z * CHUNK_SIZE + z;
+                let current_hight = pos.y() * CHUNK_SIZE;
+                let current_x = pos.x() * CHUNK_SIZE + x;
+                let current_z = pos.z() * CHUNK_SIZE + z;
                 let hight = noise.get([current_x as f64 * JIGGLE, current_z as f64 * JIGGLE]) / 2. + 0.5;
                 max = max.max(hight);
                 min = min.min(hight);
-                let hight = (hight * GROUND_HIGHT) as isize;
+                let hight = (hight * GROUND_HIGHT) as i32;
                 for y in 0..CHUNK_SIZE {
                     if y + current_hight > hight {break;}
                     chunk[(y * CHUNK_ARIA + z * CHUNK_SIZE + x) as usize] = BlockType::Air.sample(&mut rng);
@@ -33,9 +33,9 @@ impl Chunk {
         Chunk(chunk)
     }
 
-    fn get_block(&self, pos: Position) -> BlockType {
+    fn get_block(&self, pos: ChunkId) -> BlockType {
         if pos > CHUNK_SIZE - 1 || pos < 0 {return BlockType::Air;}
-        self.0[(pos.y * CHUNK_ARIA + pos.z * CHUNK_SIZE + pos.x) as usize]
+        self.0[(pos.y() * CHUNK_ARIA + pos.z() * CHUNK_SIZE + pos.x()) as usize]
     }
 
     pub fn gen_mesh(&self, atlas_map: &TextureHandels) -> Mesh {
@@ -47,7 +47,7 @@ impl Chunk {
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE{
                 for x in 0..CHUNK_SIZE {
-                    let current = Position::new(x as isize,y as isize,z as isize);
+                    let current = ChunkId::new(x,y,z);
                     let block = self.get_block(current);
                     if let BlockType::Air = block {continue;}
                     for direction in Direction::iter() {

@@ -7,3 +7,4 @@ pub const GROUND_HIGHT: f64 = 64.;
 pub use crate::textures::TextureHandels;
 pub const VIEW_DISTANCE: f32 = 5.;
 pub use crate::world::chunk::Direction;
+pub use crate::components::{ChunkId, BlockId};
