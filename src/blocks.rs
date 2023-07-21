@@ -21,7 +21,7 @@ pub struct MeshData {
     pub pos: &'static [[f32; 3]],
     pub uv: Vec<[f32; 2]>,
     pub color: &'static [[f32; 4]],
-    pub indeces: &'static [u32],
+    pub indices: &'static [u32],
 }
 
 impl BlockType {
@@ -47,14 +47,14 @@ impl BlockType {
     pub fn gen_mesh(
         &self,
         direction: crate::world::chunk::Direction,
-        atlas_map: &crate::prelude::TextureHandels,
+        atlas_map: &crate::prelude::TextureHandles,
     ) -> MeshData {
         match self {
             BlockType::Air => MeshData {
                 pos: &[],
                 uv: vec![],
                 color: &[],
-                indeces: &[],
+                indices: &[],
             },
             BlockType::Bedrock
             | BlockType::Gravel
@@ -64,7 +64,7 @@ impl BlockType {
             | BlockType::GoldOre
             | BlockType::IronOre
             | BlockType::CoalOre => {
-                let index = atlas_map.get_indexs(self);
+                let index = atlas_map.get_indexes(self);
                 BlockType::block_mesh(direction, index[0], atlas_map.len())
             }
             BlockType::DeadBush => todo!(),
@@ -72,8 +72,8 @@ impl BlockType {
         }
     }
 
-    fn grass_mesh(direction: Direction, atlas_map: &crate::prelude::TextureHandels) -> MeshData {
-        let indexs = atlas_map.get_indexs(&BlockType::Grass);
+    fn grass_mesh(direction: Direction, atlas_map: &crate::prelude::TextureHandles) -> MeshData {
+        let indexes = atlas_map.get_indexes(&BlockType::Grass);
         match direction {
             Direction::Up => MeshData {
                 pos: BlockType::block_face(direction),
@@ -117,7 +117,7 @@ impl BlockType {
             pos: BlockType::block_face(direction),
             uv: BlockType::block_uv(index_pos, index_len),
             color: &[[1., 1., 1., 1.]; 4],
-            indeces: &[0, 1, 2, 2, 3, 0],
+            indices: &[0, 1, 2, 2, 3, 0],
         }
     }
 

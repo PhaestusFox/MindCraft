@@ -1,7 +1,6 @@
 use crate::{cam::FlyCam, prelude::*};
 use bevy::{prelude::*, utils::HashSet};
 use bevy_rapier3d::prelude::*;
-
 use self::chunk::Chunk;
 
 pub mod chunk;

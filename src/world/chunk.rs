@@ -43,7 +43,7 @@ impl Chunk {
         self.0[(pos.y() * CHUNK_AREA + pos.z() * CHUNK_SIZE + pos.x()) as usize]
     }
 
-    pub fn gen_mesh(&self, atlas_map: &TextureHandels) -> Mesh {
+    pub fn gen_mesh(&self, atlas_map: &TextureHandles) -> Mesh {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
@@ -62,7 +62,7 @@ impl Chunk {
                             let block = block.gen_mesh(direction, atlas_map);
                             indices.extend(
                                 block
-                                    .indeces
+                                    .indices
                                     .into_iter()
                                     .map(|i| *i + positions.len() as u32),
                             );

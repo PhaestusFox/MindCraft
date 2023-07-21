@@ -59,7 +59,7 @@ impl TextureHandels {
     pub fn get_atlas(&self) -> Handle<StandardMaterial> {
         self.0.read().unwrap().atlas.clone()
     }
-    pub fn get_indexs(&self, block: &BlockType) -> Vec<usize> {
+    pub fn get_indexes(&self, block: &BlockType) -> Vec<usize> {
         if let Some(i) = self.0.read().unwrap().block_map.get(block) {
             i.clone()
         } else {
@@ -79,7 +79,7 @@ impl TextureHandels {
     }
 }
 
-impl FromWorld for TextureHandels {
+impl FromWorld for TextureHandles {
     fn from_world(world: &mut World) -> Self {
         let main_image = world
             .resource_mut::<Assets<Image>>()
