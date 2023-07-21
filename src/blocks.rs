@@ -77,21 +77,21 @@ impl BlockType {
         match direction {
             Direction::Up => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexs[0], atlas_map.len()),
+                uv: BlockType::block_uv(indexes[0], atlas_map.len()),
                 color: &[[0.2, 0.8, 0.2, 1.]; 4],
-                indeces: &[0, 1, 2, 2, 3, 0],
+                indices: &[0, 1, 2, 2, 3, 0],
             },
             Direction::Down => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexs[2], atlas_map.len()),
+                uv: BlockType::block_uv(indexes[2], atlas_map.len()),
                 color: &[[1., 1., 1., 1.]; 4],
-                indeces: &[0, 1, 2, 2, 3, 0],
+                indices: &[0, 1, 2, 2, 3, 0],
             },
             _ => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexs[1], atlas_map.len()),
+                uv: BlockType::block_uv(indexes[1], atlas_map.len()),
                 color: &[[1., 1., 1., 1.]; 4],
-                indeces: &[0, 1, 2, 2, 3, 0],
+                indices: &[0, 1, 2, 2, 3, 0],
             },
         }
     }

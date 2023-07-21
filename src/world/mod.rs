@@ -1,4 +1,4 @@
-use crate::{cam::FlyCam, prelude::*};
+use crate::{cam::FlyCam, prelude::*, textures::TextureHandles};
 use bevy::{prelude::*, utils::HashSet};
 use bevy_rapier3d::prelude::*;
 use self::chunk::Chunk;
@@ -27,7 +27,7 @@ pub fn gen_start_chunks(
     mut commands: Commands,
     world_descriptior: Res<WorldDescriptior>,
     mut map: ResMut<Map>,
-    matt: Res<TextureHandels>,
+    matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
 ) {
     for y in 0..5 {
@@ -61,10 +61,9 @@ pub fn gen_view_chunks(
     mut map: ResMut<Map>,
     player: Query<&Transform, With<FlyCam>>,
     world_descriptior: Res<WorldDescriptior>,
-    matt: Res<TextureHandels>,
+    matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
 ) {
-    return;
     let player = player.single().translation;
     let center = ChunkId::new(
         (player.x / CHUNK_SIZE as f32) as i32,

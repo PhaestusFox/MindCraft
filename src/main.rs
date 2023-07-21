@@ -3,7 +3,7 @@ use bevy_editor_pls::prelude::*;
 use bevy_rapier3d::prelude::*;
 use blocks::BlockType;
 use prelude::ChunkId;
-use textures::TextureHandels;
+use textures::TextureHandles;
 use world::chunk::Chunk;
 
 mod textures;
@@ -60,7 +60,7 @@ fn main() {
     app.run()
 }
 
-fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res<TextureHandels>) {
+fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res<TextureHandles>) {
     commands.spawn(DirectionalLightBundle {
         transform: Transform::from_translation(Vec3::new(0., 256., 0.))
             .with_rotation(Quat::from_rotation_x(-0.3)),
@@ -100,7 +100,7 @@ struct ChunkMeshTasks(HashMap<ChunkId, bevy::tasks::Task<Mesh>>);
 fn gen_chunk_tasks(
     chunks: Query<(&ChunkId, &Chunk), Changed<Chunk>>,
     // mut meshs: ResMut<Assets<Mesh>>,
-    atlas: Res<TextureHandels>,
+    atlas: Res<TextureHandles>,
     mut tasks: ResMut<ChunkMeshTasks>,
 ) {
     let pool = bevy::tasks::AsyncComputeTaskPool::get();

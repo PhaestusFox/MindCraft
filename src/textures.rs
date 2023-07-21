@@ -11,7 +11,7 @@ impl Plugin for TexturePlugin {
             Update,
             build_texture_atlas.run_if(resource_exists::<TextureAtlasBuilder>()),
         );
-        app.init_resource::<TextureHandels>();
+        app.init_resource::<TextureHandles>();
     }
 }
 
@@ -38,24 +38,24 @@ impl Command for MakeTextureAtlas {
                 map.push(need_textures.get_index_of(&temp).unwrap());
             }
         }
-        world.resource_mut::<TextureHandels>().set_map(map);
+        world.resource_mut::<TextureHandles>().set_map(map);
         world
-            .resource_mut::<TextureHandels>()
+            .resource_mut::<TextureHandles>()
             .set_len((need_textures.len() as f32).sqrt().ceil() as usize);
         world.insert_resource(TextureAtlasBuilder(need_textures));
     }
 }
 
-pub struct TextureHandelsInternal {
+pub struct TextureHandlesInternal {
     atlas: Handle<StandardMaterial>,
     block_map: HashMap<BlockType, Vec<usize>>,
     len: usize,
 }
 
 #[derive(Resource, Clone)]
-pub struct TextureHandels(std::sync::Arc<std::sync::RwLock<TextureHandelsInternal>>);
+pub struct TextureHandles(std::sync::Arc<std::sync::RwLock<TextureHandlesInternal>>);
 
-impl TextureHandels {
+impl TextureHandles {
     pub fn get_atlas(&self) -> Handle<StandardMaterial> {
         self.0.read().unwrap().atlas.clone()
     }
@@ -93,8 +93,8 @@ impl FromWorld for TextureHandles {
                 alpha_mode: AlphaMode::Mask(0.1),
                 ..Default::default()
             });
-        TextureHandels(std::sync::Arc::new(std::sync::RwLock::new(
-            TextureHandelsInternal {
+        TextureHandles(std::sync::Arc::new(std::sync::RwLock::new(
+            TextureHandlesInternal {
                 atlas: texture,
                 block_map: HashMap::new(),
                 len: 0,

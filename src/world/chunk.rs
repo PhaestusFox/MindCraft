@@ -19,7 +19,7 @@ impl Chunk {
                 let current_z = pos.z() * CHUNK_SIZE + z;
                 let hight =
                     noise.get([current_x as f64 * JIGGLE, current_z as f64 * JIGGLE]) / 2. + 0.5;
-                let hight = (hight * GROUND_HIGHT) as i32;
+                let hight = (hight * GROUND_HEIGHT) as i32;
                 for y in 0..CHUNK_SIZE {
                     if current_y + y == 0 {
                         chunk[(y * CHUNK_AREA + z * CHUNK_SIZE + x) as usize] = BlockType::Bedrock;
