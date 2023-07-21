@@ -4,7 +4,7 @@ use noise::NoiseFn;
 use rand::{Rng, SeedableRng};
 use strum::IntoEnumIterator;
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 pub struct Chunk([BlockType; CHUNK_VOL as usize]);
 
 impl Chunk {
@@ -22,8 +22,7 @@ impl Chunk {
                 let hight = (hight * GROUND_HIGHT) as i32;
                 for y in 0..CHUNK_SIZE {
                     if current_y + y == 0 {
-                        chunk[(y * CHUNK_AREA + z * CHUNK_SIZE + x) as usize] =
-                        BlockType::Bedrock;
+                        chunk[(y * CHUNK_AREA + z * CHUNK_SIZE + x) as usize] = BlockType::Bedrock;
                         continue;
                     }
                     if y + current_y > hight {
@@ -59,8 +58,8 @@ impl Chunk {
                         continue;
                     }
                     for direction in Direction::iter() {
-                        let block = block.gen_mesh(direction, atlas_map);
                         if let BlockType::Air = self.get_block(current.get(direction)) {
+                            let block = block.gen_mesh(direction, atlas_map);
                             indices.extend(
                                 block
                                     .indeces
@@ -84,6 +83,75 @@ impl Chunk {
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
         mesh
     }
+
+    pub fn gen_collider(&self) -> bevy_rapier3d::prelude::Collider {
+        const SIZE_LENGTH: f32 = 1.0;
+        const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
+        const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
+        use bevy_rapier3d::prelude::*;
+        let mut vertexs: Vec<bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>>> = Vec::new();
+        let mut indices = Vec::new();
+        for y in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let current = ChunkId::new(x, y, z);
+                    let block = self.get_block(current);
+                    if let BlockType::Air = block {
+                        continue;
+                    }
+                    for direction in Direction::iter() {
+                        if self.get_block(current.get(direction)) != BlockType::Air {
+                            continue;
+                        }
+                        let ind = [[0, 1, 2], [2, 3, 0]];
+                        // if direction != Direction::Forward {
+                        //     indices.extend(
+                        //         ind.map(|mut val| {
+                        //             val[0] += vertexs.len() as u32;
+                        //             val[1] += vertexs.len() as u32;
+                        //             val[2] += vertexs.len() as u32;
+                        //             val
+                        //         })
+                        //     );
+                        //     let pos = BlockType::block_face(direction);
+                        //     vertexs.extend(pos.into_iter().map(|pos: &[f32; 3]| {
+                        //         let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + x as f32, pos[1] + y as f32, pos[2] + z as f32].into();
+                        //         new_pos
+                        //     }));
+                        //     continue;
+                        // }
+                        let plane = direction.perp();
+                        if self.get_block(current.get(plane.rev())) != BlockType::Air && self.get_block(current.get(plane.rev()).get(direction)) == BlockType::Air {
+                            continue;
+                        }
+                        indices.extend(
+                            ind.map(|mut val| {
+                                val[0] += vertexs.len() as u32;
+                                val[1] += vertexs.len() as u32;
+                                val[2] += vertexs.len() as u32;
+                                val
+                            })
+                        );
+                        let mut len = 0;
+                        let mut next = current.get(plane);
+                        while self.get_block(next) != BlockType::Air {
+                            len += 1;
+                            next = next.get(plane);
+                        }
+                        vertexs.extend(BlockType::block_face_with_len(direction, len as f32)     // 3
+                            .into_iter().map(|pos| {
+                                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + x as f32, pos[1] + y as f32, pos[2] + z as f32].into();
+                                new_pos
+                            }));
+                        }
+                    }
+                }
+            }
+            if vertexs.is_empty() {
+                return Collider::ball(0.);
+            }
+            bevy_rapier3d::rapier::prelude::SharedShape::trimesh_with_flags(vertexs, indices, TriMeshFlags::MERGE_DUPLICATE_VERTICES).into()
+        }
 }
 
 #[derive(Debug, strum_macros::EnumIter, Clone, Copy, PartialEq)]
@@ -94,6 +162,30 @@ pub enum Direction {
     Right,
     Forward,
     Back,
+}
+
+impl Direction {
+    fn perp(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Forward,
+            Direction::Down => Direction::Back,
+            Direction::Left => Direction::Up,
+            Direction::Right => Direction::Down,
+            Direction::Forward => Direction::Right,
+            Direction::Back => Direction::Left,
+        }
+    }
+
+    fn rev(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::Forward => Direction::Back,
+            Direction::Back => Direction::Forward,
+        }
+    }
 }
 
 const fn gen_face(direction: Direction) -> [[f32; 3]; 4] {

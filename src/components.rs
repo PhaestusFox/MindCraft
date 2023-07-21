@@ -43,7 +43,10 @@ impl From<ChunkId> for bevy::asset::HandleId {
         use std::hash::Hasher;
         let mut hasher = std::collections::hash_map::DefaultHasher::default();
         value.hash(&mut hasher);
-        bevy::asset::HandleId::Id(uuid::uuid!("0c7f7a1b-f6ca-4006-8032-d3a0bbdcb659"), hasher.finish())
+        bevy::asset::HandleId::Id(
+            uuid::uuid!("0c7f7a1b-f6ca-4006-8032-d3a0bbdcb659"),
+            hasher.finish(),
+        )
     }
 }
 

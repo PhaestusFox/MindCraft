@@ -39,20 +39,20 @@ impl Command for MakeTextureAtlas {
             }
         }
         world.resource_mut::<TextureHandels>().set_map(map);
-        world.resource_mut::<TextureHandels>().set_len(
-            (need_textures.len() as f32).sqrt().ceil() as usize);
+        world
+            .resource_mut::<TextureHandels>()
+            .set_len((need_textures.len() as f32).sqrt().ceil() as usize);
         world.insert_resource(TextureAtlasBuilder(need_textures));
     }
 }
 
-#[derive(Clone)]
 pub struct TextureHandelsInternal {
     atlas: Handle<StandardMaterial>,
     block_map: HashMap<BlockType, Vec<usize>>,
     len: usize,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct TextureHandels(std::sync::Arc<std::sync::RwLock<TextureHandelsInternal>>);
 
 impl TextureHandels {
@@ -93,15 +93,14 @@ impl FromWorld for TextureHandels {
                 alpha_mode: AlphaMode::Mask(0.1),
                 ..Default::default()
             });
-        TextureHandels(
-            std::sync::Arc::new(std::sync::RwLock::new(
+        TextureHandels(std::sync::Arc::new(std::sync::RwLock::new(
             TextureHandelsInternal {
                 atlas: texture,
                 block_map: HashMap::new(),
                 len: 0,
-            }
+            },
         )))
-        }
+    }
 }
 
 fn build_texture_atlas(
