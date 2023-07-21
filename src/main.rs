@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_editor_pls::prelude::*;
 use bevy_rapier3d::prelude::*;
 use blocks::BlockType;
-use textures::TextureHandels;
+use textures::TextureHandles;
 use world::chunk::Chunk;
 
 mod textures;
@@ -18,7 +18,11 @@ mod components;
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins((DefaultPlugins, EditorPlugin::default(), RapierPhysicsPlugin::<()>::default()));
+    app.add_plugins((
+        DefaultPlugins,
+        EditorPlugin::default(),
+        RapierPhysicsPlugin::<()>::default(),
+    ));
     #[cfg(debug_assertions)]
     app.add_plugins(RapierDebugRenderPlugin::default());
     app.add_plugins((textures::TexturePlugin, cam::PlayerPlugin));
@@ -31,34 +35,32 @@ fn main() {
     app.run()
 }
 
-fn spawn_cube(
-    mut commands: Commands,
-    mut mesh: ResMut<Assets<Mesh>>,
-    atlas: Res<TextureHandels>,
-) {
-    commands.spawn(
-        DirectionalLightBundle {
-            transform: Transform::from_translation(Vec3::new(0., 256., 0.)).with_rotation(Quat::from_rotation_x(-0.3)),
-            directional_light: DirectionalLight {
-                shadows_enabled: true,
-                ..Default::default()
-            },
+fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res<TextureHandles>) {
+    commands.spawn(DirectionalLightBundle {
+        transform: Transform::from_translation(Vec3::new(0., 256., 0.))
+            .with_rotation(Quat::from_rotation_x(-0.3)),
+        directional_light: DirectionalLight {
+            shadows_enabled: true,
             ..Default::default()
-        }
-    );
+        },
+        ..Default::default()
+    });
 
-    commands.add(textures::MakeTextureAtlas::new([
-        BlockType::Bedrock,
-        BlockType::Gravel,
-        BlockType::Dirt,
-        BlockType::Stone,
-        BlockType::Sand,
-        BlockType::GoldOre,
-        BlockType::IronOre,
-        BlockType::CoalOre,
-        BlockType::DeadBush,
-        BlockType::Grass,
-    ].into_iter()));
+    commands.add(textures::MakeTextureAtlas::new(
+        [
+            BlockType::Bedrock,
+            BlockType::Gravel,
+            BlockType::Dirt,
+            BlockType::Stone,
+            BlockType::Sand,
+            BlockType::GoldOre,
+            BlockType::IronOre,
+            BlockType::CoalOre,
+            BlockType::DeadBush,
+            BlockType::Grass,
+        ]
+        .into_iter(),
+    ));
 
     commands.spawn(PbrBundle {
         mesh: mesh.add(blocks::make_test_block_mesh(4, 3)),
@@ -70,7 +72,7 @@ fn spawn_cube(
 fn gen_chunk_mesh(
     mut chunks: Query<(&Chunk, &mut Handle<Mesh>), Changed<Chunk>>,
     mut meshs: ResMut<Assets<Mesh>>,
-    atlas: Res<TextureHandels>,
+    atlas: Res<TextureHandles>,
 ) {
     for (chunk, mut handle) in &mut chunks {
         *handle = meshs.add(chunk.gen_mesh(&atlas));

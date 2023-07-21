@@ -1,4 +1,4 @@
-use bevy::{prelude::*, ecs::system::Command, utils::HashMap};
+use bevy::{ecs::system::Command, prelude::*, utils::HashMap};
 use indexmap::IndexSet;
 
 use crate::blocks::BlockType;
@@ -7,8 +7,11 @@ pub struct TexturePlugin;
 
 impl Plugin for TexturePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, build_texture_atlas.run_if(resource_exists::<TextureAtlasBuilder>()));
-        app.init_resource::<TextureHandels>();
+        app.add_systems(
+            Update,
+            build_texture_atlas.run_if(resource_exists::<TextureAtlasBuilder>()),
+        );
+        app.init_resource::<TextureHandles>();
     }
 }
 
@@ -35,24 +38,25 @@ impl Command for MakeTextureAtlas {
                 map.push(need_textures.get_index_of(&temp).unwrap());
             }
         }
-        let _ = std::mem::replace(&mut world.resource_mut::<TextureHandels>().block_map, map);
-        world.resource_mut::<TextureHandels>().len = (need_textures.len() as f32).sqrt().ceil() as usize;
+        let _ = std::mem::replace(&mut world.resource_mut::<TextureHandles>().block_map, map);
+        world.resource_mut::<TextureHandles>().len =
+            (need_textures.len() as f32).sqrt().ceil() as usize;
         world.insert_resource(TextureAtlasBuilder(need_textures));
     }
 }
 
 #[derive(Resource)]
-pub struct TextureHandels{
+pub struct TextureHandles {
     atlas: Handle<StandardMaterial>,
     block_map: HashMap<BlockType, Vec<usize>>,
     len: usize,
 }
 
-impl TextureHandels {
+impl TextureHandles {
     pub fn get_atlas(&self) -> Handle<StandardMaterial> {
         self.atlas.clone()
     }
-    pub fn get_indexs(&self, block: &BlockType) -> &[usize] {
+    pub fn get_indexes(&self, block: &BlockType) -> &[usize] {
         if let Some(i) = self.block_map.get(block) {
             i
         } else {
@@ -64,17 +68,21 @@ impl TextureHandels {
     }
 }
 
-impl FromWorld for TextureHandels {
+impl FromWorld for TextureHandles {
     fn from_world(world: &mut World) -> Self {
-        let main_image = world.resource_mut::<Assets<Image>>().get_handle("MainAtlas");
-        let texture = world.resource_mut::<Assets<StandardMaterial>>().add(StandardMaterial {
-            base_color_texture: Some(main_image),
-            metallic: 0.,
-            reflectance: 0.,
-            alpha_mode: AlphaMode::Mask(0.1),
-            ..Default::default()
-        });
-        TextureHandels{
+        let main_image = world
+            .resource_mut::<Assets<Image>>()
+            .get_handle("MainAtlas");
+        let texture = world
+            .resource_mut::<Assets<StandardMaterial>>()
+            .add(StandardMaterial {
+                base_color_texture: Some(main_image),
+                metallic: 0.,
+                reflectance: 0.,
+                alpha_mode: AlphaMode::Mask(0.1),
+                ..Default::default()
+            });
+        TextureHandles {
             atlas: texture,
             block_map: HashMap::new(),
             len: 0,
@@ -88,12 +96,15 @@ fn build_texture_atlas(
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    if let bevy::asset::LoadState::Loaded = asset_server.get_group_load_state(atlas_builder.0.iter().map(|h| h.id())) {
-        
+    if let bevy::asset::LoadState::Loaded =
+        asset_server.get_group_load_state(atlas_builder.0.iter().map(|h| h.id()))
+    {
     } else {
         return;
     }
-    let first = images.get(&atlas_builder.0[0]).expect("All images to be built");
+    let first = images
+        .get(&atlas_builder.0[0])
+        .expect("All images to be built");
     let atlas_size = (atlas_builder.0.len() as f32).sqrt().ceil() as usize;
     let width = first.texture_descriptor.size.width as usize;
     let format = first.texture_descriptor.format;
@@ -103,19 +114,43 @@ fn build_texture_atlas(
         for x in 0..atlas_size {
             let Some(handle) = atlas_builder.0.get_index(y * atlas_size + x) else {break 'y;};
             let Some(image) = images.get(handle) else {continue;};
-            fill_from(&mut atlas_data, x, y, atlas_size, width, &image.data, pixed_size);
+            fill_from(
+                &mut atlas_data,
+                x,
+                y,
+                atlas_size,
+                width,
+                &image.data,
+                pixed_size,
+            );
         }
     }
     let size = bevy::render::render_resource::Extent3d {
         width: (width * atlas_size) as u32,
         height: (width * atlas_size) as u32,
-        depth_or_array_layers: 1
+        depth_or_array_layers: 1,
     };
-    let _ = images.set("MainAtlas", Image::new(size, bevy::render::render_resource::TextureDimension::D2, atlas_data, format));
+    let _ = images.set(
+        "MainAtlas",
+        Image::new(
+            size,
+            bevy::render::render_resource::TextureDimension::D2,
+            atlas_data,
+            format,
+        ),
+    );
     commands.remove_resource::<TextureAtlasBuilder>();
 }
 
-fn fill_from(data: &mut Vec<u8>, offset_x: usize, offset_y: usize, atlas_size: usize, block_size: usize, image: &[u8], pixel_size: usize) {
+fn fill_from(
+    data: &mut Vec<u8>,
+    offset_x: usize,
+    offset_y: usize,
+    atlas_size: usize,
+    block_size: usize,
+    image: &[u8],
+    pixel_size: usize,
+) {
     let x_off = offset_x * block_size;
     let y_off = offset_y * block_size * block_size * atlas_size;
     for y in 0..block_size {
@@ -129,3 +164,4 @@ fn fill_from(data: &mut Vec<u8>, offset_x: usize, offset_y: usize, atlas_size: u
         }
     }
 }
+
