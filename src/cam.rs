@@ -193,6 +193,6 @@ impl Plugin for PlayerPlugin {
             .init_resource::<MovementSettings>()
             .init_resource::<KeyBindings>()
             .add_systems(Startup, (setup_player, initial_grab_cursor))
-            .add_systems(Update, (player_move,player_look,cursor_grab));
+            .add_systems(Update, (player_move, player_look, cursor_grab));
     }
 }

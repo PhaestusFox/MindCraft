@@ -2531,10 +2531,12 @@ dependencies = [
  "bevy",
  "bevy_editor_pls",
  "bevy_rapier3d",
+ "indexmap 1.9.3",
  "noise",
  "rand 0.8.5",
  "strum",
  "strum_macros",
+ "uuid",
 ]
 
 [[package]]
