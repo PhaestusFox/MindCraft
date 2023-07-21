@@ -77,21 +77,21 @@ impl BlockType {
         match direction {
             Direction::Up => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexes[0], atlas_map.len()),
-                color: &[[0., 1., 0., 1.]; 4],
-                indices: &[0, 1, 2, 2, 3, 0],
+                uv: BlockType::block_uv(indexs[0], atlas_map.len()),
+                color: &[[0.2, 0.8, 0.2, 1.]; 4],
+                indeces: &[0, 1, 2, 2, 3, 0],
             },
             Direction::Down => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexes[2], atlas_map.len()),
+                uv: BlockType::block_uv(indexs[2], atlas_map.len()),
                 color: &[[1., 1., 1., 1.]; 4],
-                indices: &[0, 1, 2, 2, 3, 0],
+                indeces: &[0, 1, 2, 2, 3, 0],
             },
             _ => MeshData {
                 pos: BlockType::block_face(direction),
-                uv: BlockType::block_uv(indexes[1], atlas_map.len()),
+                uv: BlockType::block_uv(indexs[1], atlas_map.len()),
                 color: &[[1., 1., 1., 1.]; 4],
-                indices: &[0, 1, 2, 2, 3, 0],
+                indeces: &[0, 1, 2, 2, 3, 0],
             },
         }
     }
@@ -121,7 +121,7 @@ impl BlockType {
         }
     }
 
-    const fn block_face(direction: Direction) -> &'static [[f32; 3]] {
+    pub const fn block_face(direction: Direction) -> &'static [[f32; 3]] {
         const SIZE_LENGTH: f32 = 1.0;
         const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
         const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
@@ -170,6 +170,56 @@ impl BlockType {
             ],
         }
     }
+
+        pub fn block_face_with_len(direction: Direction, len: f32) -> [[f32; 3]; 4] {
+            const SIZE_LENGTH: f32 = 1.0;
+            const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
+            const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
+            match direction {
+                Direction::Forward => [
+                    // Front face
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 0
+                    [len + HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 1
+                    [len + HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],         // 2
+                    [NEG_HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 3
+                ],
+                Direction::Back => [
+                    // Back face
+                    [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                    [NEG_HALF_LENGTH - len, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                    [NEG_HALF_LENGTH - len, HALF_LENGTH, NEG_HALF_LENGTH], // 7
+                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],     // 4
+                ],
+                Direction::Left => [
+                    // Left face
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 9
+                    [NEG_HALF_LENGTH, HALF_LENGTH + len, HALF_LENGTH],         // 10
+                    [NEG_HALF_LENGTH, HALF_LENGTH + len, NEG_HALF_LENGTH],     // 11
+                ],
+                Direction::Right => [
+                    // Right face
+                    [HALF_LENGTH, NEG_HALF_LENGTH - len, HALF_LENGTH], // 13
+                    [HALF_LENGTH, NEG_HALF_LENGTH - len, NEG_HALF_LENGTH], // 14
+                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 15
+                    [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 12
+                ],
+                Direction::Up => [
+                    // Top face
+                    [HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 16
+                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 17
+                    [NEG_HALF_LENGTH, HALF_LENGTH,NEG_HALF_LENGTH], // 18
+                    [NEG_HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 19
+                ],
+                Direction::Down => [
+                    // Bottom face
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len], // 20
+                    [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len],     // 21
+                    [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],         // 22
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 23
+                ],
+            }
+        }
 }
 
 pub fn make_test_block_mesh(block_index: usize, atlas_size: usize) -> Mesh {
@@ -249,7 +299,7 @@ impl rand::prelude::Distribution<BlockType> for BlockType {
         // match rng.gen_range(0, 3) { // rand 0.5, 0.6, 0.7
         match rng.gen_range(0..=8) {
             // rand 0.8
-            0 => BlockType::Bedrock,
+            0 => BlockType::Dirt,
             1 => BlockType::Gravel,
             2 => BlockType::Sand,
             3 => BlockType::Dirt,

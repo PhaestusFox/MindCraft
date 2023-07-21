@@ -2,7 +2,7 @@ use bevy::ecs::event::{Events, ManualEventReader};
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
-
+use bevy_rapier3d::prelude::*;
 /// Keeps track of mouse motion events, pitch, and yaw
 #[derive(Resource, Default)]
 struct InputState {
@@ -83,10 +83,13 @@ fn initial_grab_cursor(mut primary_window: Query<&mut Window, With<PrimaryWindow
 fn setup_player(mut commands: Commands) {
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(-2.0, 5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(-2.0, 128.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         },
         FlyCam,
+        RigidBody::Fixed,
+        LockedAxes::ROTATION_LOCKED,
+        Collider::capsule(Vec3::Y, Vec3::NEG_Y, 1.),
     ));
 }
 
@@ -193,6 +196,6 @@ impl Plugin for PlayerPlugin {
             .init_resource::<MovementSettings>()
             .init_resource::<KeyBindings>()
             .add_systems(Startup, (setup_player, initial_grab_cursor))
-            .add_systems(Update, (player_move,player_look,cursor_grab));
+            .add_systems(Update, (player_move, player_look, cursor_grab));
     }
 }

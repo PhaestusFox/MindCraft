@@ -1,7 +1,7 @@
 use crate::{cam::FlyCam, prelude::*};
 use bevy::{prelude::*, utils::HashSet};
-
-use self::chunk::{Chunk, Position};
+use bevy_rapier3d::prelude::*;
+use self::chunk::Chunk;
 
 pub mod chunk;
 
@@ -26,11 +26,15 @@ pub struct Map(HashSet<ChunkId>);
 pub fn gen_start_chunks(
     mut commands: Commands,
     world_descriptior: Res<WorldDescriptior>,
-    matt: Res<TextureHandles>,
+    mut map: ResMut<Map>,
+    matt: Res<TextureHandels>,
+    asset_server: Res<AssetServer>,
 ) {
     for y in 0..5 {
-        for z in 0..5 {
-            for x in 0..5 {
+        for z in -5..5 {
+            for x in -5..5 {
+                let id = ChunkId::new(x, y, z);
+                map.0.insert(id);
                 commands.spawn((
                     PbrBundle {
                         transform: Transform::from_translation(Vec3::new(
@@ -39,13 +43,13 @@ pub fn gen_start_chunks(
                             (z * CHUNK_SIZE) as f32,
                         )),
                         material: matt.get_atlas(),
+                        mesh: asset_server.get_handle(id),
                         ..Default::default()
                     },
-                    chunk::Chunk::new(
-                        ChunkId::new(x, y, z),
-                        &world_descriptior.rng,
-                        world_descriptior.seed,
-                    ),
+                    chunk::Chunk::new(id, &world_descriptior.rng, world_descriptior.seed),
+                    id,
+                    RigidBody::Fixed,
+                    Collider::cuboid((CHUNK_SIZE / 2) as f32, (CHUNK_SIZE / 2) as f32, (CHUNK_SIZE / 2) as f32),
                 ));
             }
         }
@@ -57,8 +61,10 @@ pub fn gen_view_chunks(
     mut map: ResMut<Map>,
     player: Query<&Transform, With<FlyCam>>,
     world_descriptior: Res<WorldDescriptior>,
-    matt: Res<TextureHandles>,
+    matt: Res<TextureHandels>,
+    asset_server: Res<AssetServer>,
 ) {
+    return;
     let player = player.single().translation;
     let center = ChunkId::new(
         (player.x / CHUNK_SIZE as f32) as i32,
@@ -82,9 +88,13 @@ pub fn gen_view_chunks(
                             (pos.z() * CHUNK_SIZE) as f32,
                         )),
                         material: matt.get_atlas(),
+                        mesh: asset_server.get_handle(pos),
                         ..Default::default()
                     },
                     chunk::Chunk::new(pos, &world_descriptior.rng, world_descriptior.seed),
+                    pos,
+                    RigidBody::Fixed,
+                    Collider::cuboid((CHUNK_SIZE / 2) as f32, (CHUNK_SIZE / 2) as f32, (CHUNK_SIZE / 2) as f32),
                 ));
             }
         }
@@ -104,4 +114,3 @@ pub fn hide_view_chunks(
         };
     }
 }
-

@@ -4,7 +4,7 @@ use noise::NoiseFn;
 use rand::{Rng, SeedableRng};
 use strum::IntoEnumIterator;
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 pub struct Chunk([BlockType; CHUNK_VOL as usize]);
 
 impl Chunk {
@@ -12,20 +12,20 @@ impl Chunk {
         use rand::distributions::Distribution;
         let mut chunk = [BlockType::Air; CHUNK_VOL as usize];
         let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-        let mut min = f64::MAX;
-        let mut max = f64::MIN;
         for z in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
-                let current_height = pos.y() * CHUNK_SIZE;
+                let current_y = pos.y() * CHUNK_SIZE;
                 let current_x = pos.x() * CHUNK_SIZE + x;
                 let current_z = pos.z() * CHUNK_SIZE + z;
-                let height =
+                let hight =
                     noise.get([current_x as f64 * JIGGLE, current_z as f64 * JIGGLE]) / 2. + 0.5;
-                max = max.max(height);
-                min = min.min(height);
-                let height = (height * GROUND_HEIGHT) as i32;
+                let hight = (hight * GROUND_HIGHT) as i32;
                 for y in 0..CHUNK_SIZE {
-                    if y + current_height > height {
+                    if current_y + y == 0 {
+                        chunk[(y * CHUNK_AREA + z * CHUNK_SIZE + x) as usize] = BlockType::Bedrock;
+                        continue;
+                    }
+                    if y + current_y > hight {
                         break;
                     }
                     chunk[(y * CHUNK_AREA + z * CHUNK_SIZE + x) as usize] =
@@ -33,7 +33,6 @@ impl Chunk {
                 }
             }
         }
-        println!("Chunk {pos:?}, min: {min}, max: {max}");
         Chunk(chunk)
     }
 
@@ -59,8 +58,8 @@ impl Chunk {
                         continue;
                     }
                     for direction in Direction::iter() {
-                        let block = block.gen_mesh(direction, atlas_map);
                         if let BlockType::Air = self.get_block(current.get(direction)) {
+                            let block = block.gen_mesh(direction, atlas_map);
                             indices.extend(
                                 block
                                     .indices
@@ -78,92 +77,81 @@ impl Chunk {
             }
         }
         mesh.set_indices(Some(Indices::U32(indices)));
+        mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0., 1., 0.]; positions.len()]);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, color);
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
         mesh
     }
-}
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct Position {
-    pub x: isize,
-    pub y: isize,
-    pub z: isize,
-}
-
-impl PartialEq<isize> for Position {
-    fn eq(&self, other: &isize) -> bool {
-        self.x == *other && self.y == *other && self.z == *other
-    }
-}
-
-impl PartialOrd<isize> for Position {
-    fn lt(&self, other: &isize) -> bool {
-        self.x < *other || self.y < *other || self.z < *other
-    }
-    fn gt(&self, other: &isize) -> bool {
-        self.x > *other || self.y > *other || self.z > *other
-    }
-    fn partial_cmp(&self, _: &isize) -> Option<std::cmp::Ordering> {
-        None
-    }
-}
-
-impl Position {
-    pub fn new(x: isize, y: isize, z: isize) -> Position {
-        Position { x, y, z }
-    }
-    fn get(&self, direction: Direction) -> Position {
-        match direction {
-            Direction::Up => Position {
-                x: self.x,
-                y: self.y + 1,
-                z: self.z,
-            },
-            Direction::Down => Position {
-                x: self.x,
-                y: self.y - 1,
-                z: self.z,
-            },
-            Direction::Left => Position {
-                x: self.x - 1,
-                y: self.y,
-                z: self.z,
-            },
-            Direction::Right => Position {
-                x: self.x + 1,
-                y: self.y,
-                z: self.z,
-            },
-            Direction::Forward => Position {
-                x: self.x,
-                y: self.y,
-                z: self.z + 1,
-            },
-            Direction::Back => Position {
-                x: self.x,
-                y: self.y,
-                z: self.z - 1,
-            },
+    pub fn gen_collider(&self) -> bevy_rapier3d::prelude::Collider {
+        const SIZE_LENGTH: f32 = 1.0;
+        const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
+        const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
+        use bevy_rapier3d::prelude::*;
+        let mut vertexs: Vec<bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>>> = Vec::new();
+        let mut indices = Vec::new();
+        for y in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let current = ChunkId::new(x, y, z);
+                    let block = self.get_block(current);
+                    if let BlockType::Air = block {
+                        continue;
+                    }
+                    for direction in Direction::iter() {
+                        if self.get_block(current.get(direction)) != BlockType::Air {
+                            continue;
+                        }
+                        let ind = [[0, 1, 2], [2, 3, 0]];
+                        // if direction != Direction::Forward {
+                        //     indices.extend(
+                        //         ind.map(|mut val| {
+                        //             val[0] += vertexs.len() as u32;
+                        //             val[1] += vertexs.len() as u32;
+                        //             val[2] += vertexs.len() as u32;
+                        //             val
+                        //         })
+                        //     );
+                        //     let pos = BlockType::block_face(direction);
+                        //     vertexs.extend(pos.into_iter().map(|pos: &[f32; 3]| {
+                        //         let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + x as f32, pos[1] + y as f32, pos[2] + z as f32].into();
+                        //         new_pos
+                        //     }));
+                        //     continue;
+                        // }
+                        let plane = direction.perp();
+                        if self.get_block(current.get(plane.rev())) != BlockType::Air && self.get_block(current.get(plane.rev()).get(direction)) == BlockType::Air {
+                            continue;
+                        }
+                        indices.extend(
+                            ind.map(|mut val| {
+                                val[0] += vertexs.len() as u32;
+                                val[1] += vertexs.len() as u32;
+                                val[2] += vertexs.len() as u32;
+                                val
+                            })
+                        );
+                        let mut len = 0;
+                        let mut next = current.get(plane);
+                        while self.get_block(next) != BlockType::Air {
+                            len += 1;
+                            next = next.get(plane);
+                        }
+                        vertexs.extend(BlockType::block_face_with_len(direction, len as f32)     // 3
+                            .into_iter().map(|pos| {
+                                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + x as f32, pos[1] + y as f32, pos[2] + z as f32].into();
+                                new_pos
+                            }));
+                        }
+                    }
+                }
+            }
+            if vertexs.is_empty() {
+                return Collider::ball(0.);
+            }
+            bevy_rapier3d::rapier::prelude::SharedShape::trimesh_with_flags(vertexs, indices, TriMeshFlags::MERGE_DUPLICATE_VERTICES).into()
         }
-    }
-}
-
-fn get_uv(block: usize, atlas_size: usize) -> [[f32; 2]; 4] {
-    let y = block / atlas_size;
-    let x = block - y * atlas_size;
-    let uv_off = 1.0 / atlas_size as f32;
-    let uv_x_0 = (x as f32 + 0.02) * uv_off;
-    let uv_x_1 = (x as f32 + 0.98) * uv_off;
-    let uv_y_0 = (y as f32 + 0.02) * uv_off;
-    let uv_y_1 = (y as f32 + 0.98) * uv_off;
-    [
-        [uv_x_0, uv_y_1],
-        [uv_x_1, uv_y_1],
-        [uv_x_1, uv_y_0],
-        [uv_x_0, uv_y_0],
-    ]
 }
 
 #[derive(Debug, strum_macros::EnumIter, Clone, Copy, PartialEq)]
@@ -174,6 +162,30 @@ pub enum Direction {
     Right,
     Forward,
     Back,
+}
+
+impl Direction {
+    fn perp(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Forward,
+            Direction::Down => Direction::Back,
+            Direction::Left => Direction::Up,
+            Direction::Right => Direction::Down,
+            Direction::Forward => Direction::Right,
+            Direction::Back => Direction::Left,
+        }
+    }
+
+    fn rev(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::Forward => Direction::Back,
+            Direction::Back => Direction::Forward,
+        }
+    }
 }
 
 const fn gen_face(direction: Direction) -> [[f32; 3]; 4] {
