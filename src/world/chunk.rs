@@ -48,7 +48,8 @@ impl Chunk {
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
         let mut color: Vec<[f32; 4]> = Vec::new();
-        let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList);
+        let mut mesh = Mesh::new(
+            bevy::render::render_resource::PrimitiveTopology::TriangleList);
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
@@ -104,22 +105,6 @@ impl Chunk {
                             continue;
                         }
                         let ind = [[0, 1, 2], [2, 3, 0]];
-                        // if direction != Direction::Forward {
-                        //     indices.extend(
-                        //         ind.map(|mut val| {
-                        //             val[0] += vertexs.len() as u32;
-                        //             val[1] += vertexs.len() as u32;
-                        //             val[2] += vertexs.len() as u32;
-                        //             val
-                        //         })
-                        //     );
-                        //     let pos = BlockType::block_face(direction);
-                        //     vertexs.extend(pos.into_iter().map(|pos: &[f32; 3]| {
-                        //         let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + x as f32, pos[1] + y as f32, pos[2] + z as f32].into();
-                        //         new_pos
-                        //     }));
-                        //     continue;
-                        // }
                         let plane = direction.perp();
                         if self.get_block(current.get(plane.rev())) != BlockType::Air && self.get_block(current.get(plane.rev()).get(direction)) == BlockType::Air {
                             continue;

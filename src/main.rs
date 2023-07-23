@@ -124,7 +124,6 @@ fn add_chunk_meshes(mut tasks: ResMut<ChunkMeshTasks>,
             done.push(*id);
         }
     }
-
     for id in done {
         let task = tasks.0.remove(&id).expect("I know its there");
         events.send(MeshEvent::GenCollider(id));

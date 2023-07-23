@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 bevy = {version = "0.11", features = ["trace"]}
 bevy_editor_pls = {git = "https://github.com/jakobhellermann/bevy_editor_pls.git"}
-bevy_rapier3d = { version = "*", features = [ "simd-stable", "debug-render-2d" ] }
+bevy_rapier3d = { version = "*", features = [ "simd-stable", "debug-render-3d" ] }
 rand = "0.8"
 strum_macros = "*"
 strum = "*"
