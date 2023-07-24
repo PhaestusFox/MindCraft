@@ -8,6 +8,17 @@ use crate::prelude::*;
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkId(IVec3);
 
+impl From<Vec3> for ChunkId {
+    fn from(value: Vec3) -> Self {
+        let value = value.as_ivec3();
+        ChunkId(IVec3::new(
+            value.x / CHUNK_SIZE,
+            value.y / CHUNK_SIZE,
+            value.z / CHUNK_SIZE,
+        ))
+    }
+}
+
 impl ChunkId {
     pub fn new(x: i32, y: i32, z: i32) -> ChunkId {
         ChunkId(IVec3 { x, y, z })
@@ -34,6 +45,23 @@ impl ChunkId {
             Direction::Forward => ChunkId::new(self.x(), self.y(), self.z() + 1),
             Direction::Back => ChunkId::new(self.x(), self.y(), self.z() - 1),
         }
+    }
+
+    /// returns the number of chunks between self and other
+    /// this is the sqr distance since there is no need waste time sqruting
+    pub fn sqr_distance(&self, other: ChunkId) -> i32 {
+        let x_dif = self.x() - other.x();
+        let y_dif = self.y() - other.y();
+        let z_dif = self.z() - other.z();
+        x_dif * x_dif + y_dif * y_dif + z_dif * z_dif
+    }
+    /// returns the number of chunks between self and other ignoring changes in y
+    /// this is the sqr distance since there is no need waste time sqruting
+    /// I use this for render distance since if you are too far up all the chunks unload
+    pub fn flat_distance(&self, other: ChunkId) -> i32 {
+        let x_dif = self.x() - other.x();
+        let z_dif = self.z() - other.z();
+        x_dif.abs() + z_dif.abs()
     }
 }
 

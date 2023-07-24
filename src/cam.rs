@@ -89,7 +89,7 @@ fn setup_player(mut commands: Commands) {
         FlyCam,
         RigidBody::Fixed,
         LockedAxes::ROTATION_LOCKED,
-        Collider::capsule(Vec3::Y, Vec3::NEG_Y, 1.),
+        Collider::capsule(Vec3::Y * 0.5, Vec3::NEG_Y * 0.5, 0.5),
     ));
 }
 

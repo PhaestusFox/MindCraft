@@ -29,14 +29,17 @@ impl Command for MakeTextureAtlas {
         let mut need_textures = IndexSet::with_capacity(self.0.len());
         let mut map = HashMap::with_capacity(self.0.len());
         let asset_server = world.resource::<AssetServer>();
-        for block in self.0 {
+        for block in self.0.iter() {
             for path in block.get_texture_paths() {
                 let handle = asset_server.load::<_, &str>(path);
                 let temp = handle.clone_weak();
                 need_textures.insert(handle);
-                let map: &mut Vec<usize> = map.entry(block).or_default();
+                let map: &mut Vec<usize> = map.entry(*block).or_default();
                 map.push(need_textures.get_index_of(&temp).unwrap());
             }
+        }
+        if self.0.contains(&BlockType::Water) {
+            map.insert(BlockType::Water, vec![need_textures.len()]);
         }
         world.resource_mut::<TextureHandles>().set_map(map);
         world
@@ -47,6 +50,7 @@ impl Command for MakeTextureAtlas {
 }
 
 pub struct TextureHandlesInternal {
+    water: Handle<StandardMaterial>,
     atlas: Handle<StandardMaterial>,
     block_map: HashMap<BlockType, Vec<usize>>,
     len: usize,
@@ -59,6 +63,11 @@ impl TextureHandles {
     pub fn get_atlas(&self) -> Handle<StandardMaterial> {
         self.0.read().unwrap().atlas.clone()
     }
+
+    pub fn get_water(&self) -> Handle<StandardMaterial> {
+        self.0.read().unwrap().water.clone()
+    }
+
     pub fn get_indexes(&self, block: &BlockType) -> Vec<usize> {
         if let Some(i) = self.0.read().unwrap().block_map.get(block) {
             i.clone()
@@ -93,8 +102,19 @@ impl FromWorld for TextureHandles {
                 alpha_mode: AlphaMode::Mask(0.1),
                 ..Default::default()
             });
+        let water_img = world.resource::<AssetServer>().load("Water.png");
+        let water = world
+            .resource_mut::<Assets<StandardMaterial>>()
+            .add(StandardMaterial {
+                base_color_texture: Some(water_img),
+                metallic: 0.,
+                reflectance: 0.,
+                alpha_mode: AlphaMode::Add,
+                ..Default::default()
+            });
         TextureHandles(std::sync::Arc::new(std::sync::RwLock::new(
             TextureHandlesInternal {
+                water,
                 atlas: texture,
                 block_map: HashMap::new(),
                 len: 0,
@@ -118,14 +138,30 @@ fn build_texture_atlas(
     let first = images
         .get(&atlas_builder.0[0])
         .expect("All images to be built");
-    let atlas_size = (atlas_builder.0.len() as f32).sqrt().ceil() as usize;
+    let atlas_size = ((atlas_builder.0.len() + 1) as f32).sqrt().ceil() as usize;
     let width = first.texture_descriptor.size.width as usize;
     let format = first.texture_descriptor.format;
     let pixed_size = format.block_size(None).unwrap() as usize;
     let mut atlas_data = vec![0; (atlas_size * atlas_size * width * width * pixed_size) as usize];
+    let mut has_water = false;
     'y: for y in 0..atlas_size {
         for x in 0..atlas_size {
-            let Some(handle) = atlas_builder.0.get_index(y * atlas_size + x) else {break 'y;};
+            let Some(handle) = atlas_builder.0.get_index(y * atlas_size + x) else {
+            if has_water {
+                break 'y;
+            }
+            has_water = true;
+            fill_from(
+                &mut atlas_data,
+                x,
+                y,
+                atlas_size,
+                width,
+                &vec![255; width * width * pixed_size],
+                pixed_size,
+            );
+            continue;
+            };
             let Some(image) = images.get(handle) else {continue;};
             fill_from(
                 &mut atlas_data,
