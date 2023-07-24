@@ -1,6 +1,7 @@
 use crate::{cam::FlyCam, prelude::*, textures::TextureHandles};
 use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use bevy_rapier3d::prelude::*;
+use indexmap::IndexMap;
 use self::chunk::Chunk;
 
 pub mod chunk;
@@ -20,13 +21,14 @@ impl WorldDescriptior {
     }
 }
 
-#[derive(Resource, Default, Clone)]
-pub struct Map(std::sync::Arc<std::sync::RwLock<MapInternal>>);
+#[derive(Resource, Clone)]
+pub struct Map(std::sync::Arc<std::sync::RwLock<MapInternal>>, std::sync::Arc<std::thread::JoinHandle<()>>);
 
-#[derive(Default)]
 struct MapInternal {
+    descriptior: WorldDescriptior,
     chunks: HashMap<ChunkId, Chunk>,
-    new: HashSet<ChunkId>,
+    can_mesh: HashSet<ChunkId>,
+    to_gen: IndexMap<ChunkId, Option<Entity>>,
 }
 
 impl MapInternal {
@@ -34,7 +36,8 @@ impl MapInternal {
         let chunk = ChunkId::from(block);
         let block = block - chunk;
         let Some(chunk) = self.get_chunk(&chunk) else {
-            return BlockType::Air;};
+            return BlockType::Air;
+        };
         chunk.get_block(block)
     }
 
@@ -46,15 +49,40 @@ impl MapInternal {
         self.chunks.get(id).and_then(|e| e.entity)
     }
 
-    pub fn gen_chunk(&mut self, id: ChunkId, descriptior: &WorldDescriptior, entity: Entity) {
-        let mut chunk = chunk::Chunk::new(id, &descriptior.rng, descriptior.seed);
-        chunk.set_entity(entity);
-        self.new.insert(id);
-        self.chunks.insert(id, chunk);
+    fn gen_chunk(&self, id: ChunkId) -> Option<Chunk> {
+        if self.chunks.contains_key(&id) {return None;}
+        println!("gen {:?}", id);
+        Some(chunk::Chunk::new(id, &self.descriptior.rng, self.descriptior.seed))
+    }
+
+    fn get_or_gen_chunk_mut(&mut self, id: ChunkId) -> &mut Chunk {
+        if !self.chunks.contains_key(&id) {
+            let chunk = self.gen_chunk(id).expect("Chunk Not in map");
+            self.chunks.insert(id, chunk);
+        }
+        self.chunks.get_mut(&id).expect("Add missing chunk")
+    }
+
+    pub fn gen_or_update_chunk(&mut self, id: ChunkId, entity: Entity) {
+        for n in id.neighbours() {
+            if n.y() > 4 || n.y() < 0 {continue;}
+            self.add_to_gen(n, None);
+        }
+
+        self.to_gen.insert(id, Some(entity));
+    }
+
+    fn add_to_gen(&mut self, id: ChunkId, entity: Option<Entity>) {
+        if self.chunks.contains_key(&id) {
+            return;
+        }
+        if !self.to_gen.contains_key(&id) || entity.is_some() {
+            self.to_gen.insert(id, entity);
+        }
     }
 
     pub fn contains_chunk(&self, id: &ChunkId) -> bool {
-        self.chunks.contains_key(id)
+        self.chunks.contains_key(id) || self.to_gen.contains_key(id)
     }
 
     pub fn remove_chunk(&mut self, id: &ChunkId) {
@@ -62,17 +90,21 @@ impl MapInternal {
     }
 
     pub fn take_new(&mut self) -> Vec<ChunkId> {
-        self.new.drain().collect()
+        self.can_mesh.drain().collect()
+    }
+
+    pub fn new_with_seed(seed: u64) -> MapInternal {
+        MapInternal { descriptior: WorldDescriptior::new(seed), chunks: default(), can_mesh: default(), to_gen: default() }
     }
 }
 
 impl Map {
-    pub fn get_entity(&self, id: &ChunkId) -> Option<Entity> {
-        self.0.read().unwrap().get_entity(id)
+    pub fn to_gen(&self, id: &ChunkId) -> bool {
+        self.0.read().unwrap().to_gen.contains_key(id)
     }
 
-    pub fn gen_chunk(&self, id: ChunkId, descriptior: &WorldDescriptior, entity: Entity) {
-        self.0.write().unwrap().gen_chunk(id, descriptior, entity)
+    pub fn get_entity(&self, id: &ChunkId) -> Option<Entity> {
+        self.0.read().unwrap().get_entity(id)
     }
 
     pub fn contains_chunk(&self, id: &ChunkId) -> bool {
@@ -86,11 +118,47 @@ impl Map {
     pub fn take_new(&self) -> Vec<ChunkId> {
         self.0.write().unwrap().take_new()
     }
+    
+    pub fn gen_or_update_chunk(&self, id: ChunkId, entity: Entity) {
+        self.0.write().unwrap().gen_or_update_chunk(id, entity)
+    }
+
+    pub fn new() -> Map {
+        use rand::Rng;
+        Map::new_with_seed(rand::thread_rng().gen())
+    }
+
+    pub fn new_with_seed(seed: u64) -> Map {
+        let internal = MapInternal::new_with_seed(seed);
+        let internal = std::sync::Arc::new(std::sync::RwLock::new(internal));
+        let rec_local = internal.clone();
+        let join = std::thread::spawn(move || {
+            loop {
+            let mut made = Vec::with_capacity(10);
+            let Ok(mut rec) = rec_local.try_write() else {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            };
+            for _ in 0..10 {
+                let (id, entity) = if let Some((id, entity)) = rec.to_gen.iter().next() {(*id, *entity)} else {break;};
+                let chunk = rec.get_or_gen_chunk_mut(id);
+                if let Some(entity) = entity {
+                    chunk.set_entity(entity);
+                    rec.can_mesh.insert(id);
+                }
+                made.push(id);
+            }
+            for made in made {
+                rec.to_gen.remove(&made);
+            }
+            }
+        });
+        Map(internal, std::sync::Arc::new(join))
+    }
 }
 
 pub fn gen_start_chunks(
     mut commands: Commands,
-    world_descriptior: Res<WorldDescriptior>,
     map: Res<Map>,
     matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
@@ -113,7 +181,7 @@ pub fn gen_start_chunks(
                     id,
                     RigidBody::Fixed,
                 )).id();
-                map.gen_chunk(id, &world_descriptior, entity);
+                map.gen_or_update_chunk(id, entity);
             }
         }
     }
@@ -123,7 +191,6 @@ pub fn gen_view_chunks(
     mut commands: Commands,
     map: Res<Map>,
     player: Query<&Transform, With<FlyCam>>,
-    world_descriptior: Res<WorldDescriptior>,
     matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
     view_distance: Res<crate::settings::ViewDistance>,
@@ -138,7 +205,7 @@ pub fn gen_view_chunks(
     for z in -view_distance..view_distance {
         for x in -view_distance..view_distance {
             let pos = ChunkId::new(center.x() + x, 0, center.z() + z);
-            if map.contains_chunk(&pos) {
+            if map.get_entity(&pos).is_some() || map.to_gen(&pos) {
                 continue;
             }
             for y in 0..5 {
@@ -157,7 +224,7 @@ pub fn gen_view_chunks(
                     pos,
                     RigidBody::Fixed,
                 )).id();
-                map.gen_chunk(pos, &world_descriptior, entity);
+                map.gen_or_update_chunk(pos, entity);
             }
         }
     }

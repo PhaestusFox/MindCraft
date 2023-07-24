@@ -20,23 +20,23 @@ impl From<Vec3> for ChunkId {
 }
 
 impl ChunkId {
-    pub fn new(x: i32, y: i32, z: i32) -> ChunkId {
+    pub const fn new(x: i32, y: i32, z: i32) -> ChunkId {
         ChunkId(IVec3 { x, y, z })
     }
 
-    pub fn x(&self) -> i32 {
+    pub const fn x(&self) -> i32 {
         self.0.x
     }
 
-    pub fn y(&self) -> i32 {
+    pub const fn y(&self) -> i32 {
         self.0.y
     }
 
-    pub fn z(&self) -> i32 {
+    pub const fn z(&self) -> i32 {
         self.0.z
     }
 
-    pub fn get(&self, direction: Direction) -> ChunkId {
+    pub const fn get(&self, direction: Direction) -> ChunkId {
         match direction {
             Direction::Up => ChunkId::new(self.x(), self.y() + 1, self.z()),
             Direction::Down => ChunkId::new(self.x(), self.y() - 1, self.z()),
@@ -62,6 +62,17 @@ impl ChunkId {
         let x_dif = self.x() - other.x();
         let z_dif = self.z() - other.z();
         x_dif.abs() + z_dif.abs()
+    }
+
+    pub const fn neighbours(&self) -> [ChunkId; 6] {
+        [
+           self.get(Direction::Up), 
+           self.get(Direction::Down), 
+           self.get(Direction::Left), 
+           self.get(Direction::Right), 
+           self.get(Direction::Forward), 
+           self.get(Direction::Back), 
+        ]
     }
 }
 

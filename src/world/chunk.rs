@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{prelude::*, render::mesh::Indices, utils::HashMap};
+use bevy::{prelude::*, render::mesh::Indices};
 use bevy_rapier3d::prelude::Collider;
 use noise::NoiseFn;
 use rand::{Rng, SeedableRng};
@@ -22,13 +22,9 @@ pub struct ChunkGenData {
 
 impl Chunk {
     pub async fn make_mesh(id: ChunkId, map: super::Map, atlas_map: TextureHandles) -> Option<ChunkGenData> {
-        let map = map.0.read().unwrap();
-        let chunk = map.get_chunk(&id)?;
-        Some(ChunkGenData {
-            main_mesh: chunk.gen_mesh(&atlas_map, &map),
-            water_mesh: chunk.gen_water_mesh(&atlas_map, &map),
-            collider: chunk.gen_collider()
-        })
+            let map = map.0.read().unwrap();
+            let chunk = map.get_chunk(&id)?;
+            Some(ChunkGenData { main_mesh: chunk.gen_mesh(&atlas_map, &map), water_mesh: chunk.gen_water_mesh(&atlas_map, &map), collider: chunk.gen_collider() })
     }
 
     pub fn set_entity(&mut self, entity: Entity) {

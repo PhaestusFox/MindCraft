@@ -61,7 +61,7 @@ fn main() {
             add_chunk_meshes,
         ),
     );
-    app.insert_resource(world::Map::default())
+    app.insert_resource(world::Map::new_with_seed(3))
     .init_resource::<ChunkMeshTasks>();
     app.init_resource::<ViewDistance>();
     app.register_type::<ViewDistance>();
