@@ -109,7 +109,9 @@ impl FromWorld for TextureHandles {
                 base_color_texture: Some(water_img),
                 metallic: 0.,
                 reflectance: 0.,
-                alpha_mode: AlphaMode::Add,
+                alpha_mode: AlphaMode::Premultiplied,
+                unlit: false,
+                depth_bias: 1000.,
                 ..Default::default()
             });
         TextureHandles(std::sync::Arc::new(std::sync::RwLock::new(

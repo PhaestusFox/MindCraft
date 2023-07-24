@@ -90,7 +90,7 @@ impl BlockType {
         }
     }
 
-    pub fn water_mesh(direction: Direction, atlas_map: &crate::prelude::TextureHandles, top_air: bool) -> MeshData {
+    pub fn water_mesh(direction: Direction, atlas_map: &crate::prelude::TextureHandles, top_air: bool, facing_solid: bool) -> MeshData {
         let indexes = atlas_map.get_indexes(&BlockType::Water);
         MeshData {
             pos: if top_air { BlockType::water_face(direction) } else {
@@ -98,12 +98,12 @@ impl BlockType {
             },
             uv: BlockType::block_uv(indexes[0], atlas_map.len()),
             color: &[[0.2, 0.2, 0.8, 0.25]; 4],
-            indices: &[0, 1, 2, 2, 3, 0],
+            indices: if facing_solid { &[2, 1, 0, 0, 3, 2] } else {&[0, 1, 2, 2, 3, 0, 2, 1, 0, 0, 3, 2]},
         }
     }
 
     pub fn water_face(direction: Direction) -> &'static [[f32; 3]] {
-        const SIZE_LENGTH: f32 = 1.0;
+        const SIZE_LENGTH: f32 = 1.00;
         const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
         const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
         match direction {

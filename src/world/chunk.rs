@@ -5,6 +5,8 @@ use noise::NoiseFn;
 use rand::{Rng, SeedableRng};
 use strum::IntoEnumIterator;
 
+use super::MapInternal;
+
 #[derive(Clone, Copy)]
 pub struct Chunk {
     pub id: ChunkId,
@@ -23,8 +25,8 @@ impl Chunk {
         let map = map.0.read().unwrap();
         let chunk = map.get_chunk(&id)?;
         Some(ChunkGenData {
-            main_mesh: chunk.gen_mesh(&atlas_map),
-            water_mesh: chunk.gen_water_mesh(&atlas_map),
+            main_mesh: chunk.gen_mesh(&atlas_map, &map),
+            water_mesh: chunk.gen_water_mesh(&atlas_map, &map),
             collider: chunk.gen_collider()
         })
     }
@@ -90,14 +92,14 @@ impl Chunk {
         }
     }
 
-    fn get_block(&self, pos: ChunkId) -> BlockType {
+    pub fn get_block(&self, pos: BlockId) -> BlockType {
         if pos > CHUNK_SIZE - 1 || pos < 0 {
             return BlockType::Air;
         }
         self.blocks[(pos.y() * CHUNK_AREA + pos.z() * CHUNK_SIZE + pos.x()) as usize]
     }
 
-    pub fn gen_mesh(&self, atlas_map: &TextureHandles) -> Option<Mesh> {
+    fn gen_mesh(&self, atlas_map: &TextureHandles, map: &MapInternal) -> Option<Mesh> {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
@@ -105,14 +107,15 @@ impl Chunk {
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
-                    let current = ChunkId::new(x, y, z);
+                    let current = BlockId::new(x, y, z);
                     let block = self.get_block(current);
+                    assert_eq!(block, map.get_block(self.id + current));
                     match block {
                         BlockType::Air | BlockType::Water => continue,
                         _ => {}
                     }
                     for direction in Direction::iter() {
-                        if self.get_block(current.get(direction)).is_transparent() {
+                        if map.get_block(self.id + current.get(direction)).is_transparent() {
                             let block = block.gen_mesh(direction, atlas_map);
                             indices.extend(
                                 block
@@ -143,7 +146,7 @@ impl Chunk {
         Some(mesh)
     }
 
-    pub fn gen_water_mesh(&self, atlas_map: &TextureHandles) -> Option<Mesh> {
+    fn gen_water_mesh(&self, atlas_map: &TextureHandles, map: &MapInternal) -> Option<Mesh> {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
@@ -151,13 +154,14 @@ impl Chunk {
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
-                    let current = ChunkId::new(x, y, z);
+                    let current = BlockId::new(x, y, z);
                     let block = self.get_block(current);
                     if let BlockType::Water = block {
                         for direction in Direction::iter() {
-                            if let BlockType::Air = self.get_block(current.get(direction)) {
-                                let is_top_air = self.get_block(current.get(Direction::Up)) == BlockType::Air;
-                                let block = BlockType::water_mesh(direction, atlas_map, is_top_air);
+                            let facing = map.get_block(self.id + current.get(direction));
+                            if facing != BlockType::Water {
+                                let is_top_air = map.get_block(self.id + current.get(Direction::Up)) == BlockType::Air;
+                                let block = BlockType::water_mesh(direction, atlas_map, is_top_air, facing.is_solid());
                                 indices.extend(
                                     block
                                         .indices
@@ -195,7 +199,7 @@ impl Chunk {
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
-                    let current = ChunkId::new(x, y, z);
+                    let current = BlockId::new(x, y, z);
                     let block = self.get_block(current);
                     match block {
                         BlockType::Air | BlockType::Water => continue,

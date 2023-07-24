@@ -30,6 +30,14 @@ struct MapInternal {
 }
 
 impl MapInternal {
+    pub fn get_block(&self, block: BlockId) -> BlockType {
+        let chunk = ChunkId::from(block);
+        let block = block - chunk;
+        let Some(chunk) = self.get_chunk(&chunk) else {
+            return BlockType::Air;};
+        chunk.get_block(block)
+    }
+
     pub fn get_chunk(&self, id: &ChunkId) -> Option<&Chunk> {
         self.chunks.get(id)
     }

@@ -23,7 +23,9 @@ mod components;
 fn main() {
     let mut app = App::new();
     app.add_plugins((
-        DefaultPlugins.build().disable::<bevy::log::LogPlugin>().set(AssetPlugin{
+        DefaultPlugins.build()
+        // .disable::<bevy::log::LogPlugin>()
+        .set(AssetPlugin{
             watch_for_changes: bevy::asset::ChangeWatcher::with_delay(std::time::Duration::from_millis(50)),
             ..Default::default()
         }),
