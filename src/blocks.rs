@@ -1,7 +1,7 @@
 use crate::prelude::Direction;
 use bevy::{prelude::*, render::mesh::VertexAttributeValues, utils::HashMap};
 
-#[derive(Debug, Default, Clone, Copy, strum_macros::EnumIter, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, strum_macros::EnumIter, strum_macros::EnumCount, PartialEq, Eq, Hash, strum_macros::FromRepr)]
 pub enum BlockType {
     #[default]
     Air,
@@ -13,7 +13,7 @@ pub enum BlockType {
     GoldOre,
     IronOre,
     CoalOre,
-    DeadBush,
+    // DeadBush,
     Grass,
     Water,
 }
@@ -53,7 +53,7 @@ impl BlockType {
             BlockType::GoldOre => &["PureBDcraft/textures/block/gold_ore.png"],
             BlockType::IronOre => &["PureBDcraft/textures/block/iron_ore.png"],
             BlockType::CoalOre => &["PureBDcraft/textures/block/coal_ore.png"],
-            BlockType::DeadBush => &["PureBDcraft/textures/block/dead_bush.png"],
+            // BlockType::DeadBush => &["PureBDcraft/textures/block/dead_bush.png"],
             BlockType::Grass => &[
                 "PureBDcraft/textures/block/grass_block_top.png",
                 "PureBDcraft/textures/block/grass_block_side.png",
@@ -62,6 +62,24 @@ impl BlockType {
             BlockType::Water => &[],
         }
     }
+    
+    pub const fn get_icon_paths(&self) -> &'static str {
+        match self {
+            BlockType::Air => "",
+            BlockType::Bedrock => "PureBDcraft/textures/block/bedrock.png",
+            BlockType::Gravel => "PureBDcraft/textures/block/gravel.png",
+            BlockType::Dirt => "PureBDcraft/textures/block/dirt.png",
+            BlockType::Stone => "PureBDcraft/textures/block/stone.png",
+            BlockType::Sand => "PureBDcraft/textures/block/sand.png",
+            BlockType::GoldOre => "PureBDcraft/textures/block/gold_ore.png",
+            BlockType::IronOre => "PureBDcraft/textures/block/iron_ore.png",
+            BlockType::CoalOre => "PureBDcraft/textures/block/coal_ore.png",
+            // BlockType::DeadBush => "PureBDcraft/textures/block/dead_bush.png",
+            BlockType::Grass => "PureBDcraft/textures/block/grass_block_side.png",
+            BlockType::Water => "",
+        }
+    }
+
     pub fn gen_mesh(
         &self,
         direction: crate::world::chunk::Direction,
@@ -79,7 +97,7 @@ impl BlockType {
                 let index = atlas_map.get_indexes(self);
                 BlockType::block_mesh(direction, index[0], atlas_map.len())
             }
-            BlockType::DeadBush => todo!(),
+            // BlockType::DeadBush => todo!(),
             BlockType::Grass => BlockType::grass_mesh(direction, atlas_map),
             BlockType::Air | BlockType::Water => MeshData {
                 pos: &[],

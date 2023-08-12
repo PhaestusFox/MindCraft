@@ -1,10 +1,30 @@
-use crate::{cam::FlyCam, prelude::*, textures::TextureHandles};
+use crate::{cam::FlyCam, prelude::*, textures::TextureHandles, GameState, Playing, player_controller::Player};
 use bevy::{prelude::*, utils::{HashMap, HashSet}};
 use bevy_rapier3d::prelude::*;
 use indexmap::IndexMap;
 use self::chunk::Chunk;
 
 pub mod chunk;
+
+pub struct WorldPlugin;
+
+impl Plugin for WorldPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(OnEnter(GameState::GenWorld), gen_start_chunks)
+        .add_systems(Update, (gen_view_chunks, hide_view_chunks).in_set(Playing))
+        .insert_resource(WorldDescriptior::new(3))
+        .add_systems(Update, set_to_playing.run_if(in_state(GameState::GenWorld)));
+    }
+}
+
+fn set_to_playing(
+    mut next: ResMut<NextState<GameState>>,
+    map: Res<Map>,
+) {
+    if map.to_gen_len() == 0 {
+        next.set(GameState::Playing);
+    }
+}
 
 #[derive(Resource)]
 pub struct WorldDescriptior {
@@ -18,6 +38,13 @@ impl WorldDescriptior {
         rng.frequency = 0.05;
         rng.persistence = 0.25;
         WorldDescriptior { seed, rng }
+    }
+
+    pub fn set_seed(&mut self, seed: u64) {
+        use noise::Seedable;
+        self.seed = seed;
+        let rng = std::mem::take(&mut self.rng);
+        self.rng = rng.set_seed(((seed >> 32) ^ seed) as u32);
     }
 }
 
@@ -41,8 +68,37 @@ impl MapInternal {
         chunk.get_block(block)
     }
 
+    pub fn set_block(&mut self, chunk_id: ChunkId, block: BlockId, to: BlockType) {
+        let Some(chunk) = self.get_chunk_mut(&chunk_id) else {
+            return;
+        };
+        chunk.set_block(block, to);
+        self.can_mesh.insert(chunk_id);
+        if block.x() == 0 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Left));
+        } else if block.x() == CHUNK_SIZE - 1 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Right));
+        }
+
+        if block.y() == 0 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Down));
+        } else if block.y() == CHUNK_SIZE - 1 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Up));
+        }
+
+        if block.z() == 0 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Back));
+        } else if block.z() == CHUNK_SIZE - 1 {
+            self.can_mesh.insert(chunk_id.get(chunk::Direction::Forward));
+        }
+    }
+
     pub fn get_chunk(&self, id: &ChunkId) -> Option<&Chunk> {
         self.chunks.get(id)
+    }
+
+    pub fn get_chunk_mut(&mut self, id: &ChunkId) -> Option<&mut Chunk> {
+        self.chunks.get_mut(id)
     }
 
     pub fn get_entity(&self, id: &ChunkId) -> Option<Entity> {
@@ -51,7 +107,6 @@ impl MapInternal {
 
     fn gen_chunk(&self, id: ChunkId) -> Option<Chunk> {
         if self.chunks.contains_key(&id) {return None;}
-        println!("gen {:?}", id);
         Some(chunk::Chunk::new(id, &self.descriptior.rng, self.descriptior.seed))
     }
 
@@ -96,11 +151,30 @@ impl MapInternal {
     pub fn new_with_seed(seed: u64) -> MapInternal {
         MapInternal { descriptior: WorldDescriptior::new(seed), chunks: default(), can_mesh: default(), to_gen: default() }
     }
+
+    pub fn to_gen(&self) -> usize {
+        self.to_gen.len()
+    }
 }
 
 impl Map {
+    pub fn set_block(&self, block: BlockId, to: BlockType) {
+        let chunk = ChunkId::from(block);
+        let block = block - chunk;
+        self.0.write().unwrap().set_block(chunk, block, to);
+    }
+
     pub fn to_gen(&self, id: &ChunkId) -> bool {
         self.0.read().unwrap().to_gen.contains_key(id)
+    }
+
+    pub fn get_max_hight(&self, block: BlockId) -> i32 {
+        let map = self.0.read().unwrap();
+        let mut block = BlockId::new(block.x(), 0, block.z());
+        while map.get_block(block) != BlockType::Air && map.get_block(block.get(chunk::Direction::Up)) != BlockType::Air {
+            block = block.get(chunk::Direction::Up);
+        }
+        block.y()
     }
 
     pub fn get_entity(&self, id: &ChunkId) -> Option<Entity> {
@@ -155,6 +229,15 @@ impl Map {
         });
         Map(internal, std::sync::Arc::new(join))
     }
+
+    pub fn set_seed(&self, seed: u64) {
+        let mut core = self.0.write().unwrap();
+        core.descriptior.set_seed(seed);
+    }
+
+    pub fn to_gen_len(&self) -> usize {
+        self.0.read().unwrap().to_gen()
+    }
 }
 
 pub fn gen_start_chunks(
@@ -187,10 +270,11 @@ pub fn gen_start_chunks(
     }
 }
 
+const MAX_PER_FRAME: usize = 50;
 pub fn gen_view_chunks(
     mut commands: Commands,
     map: Res<Map>,
-    player: Query<&Transform, With<FlyCam>>,
+    player: Query<&Transform, With<Player>>,
     matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
     view_distance: Res<crate::settings::ViewDistance>,
@@ -201,6 +285,7 @@ pub fn gen_view_chunks(
         0,
         (player.z / CHUNK_SIZE as f32) as i32,
     );
+    let mut num_this_frame = 0;
     let view_distance = view_distance.0;
     for z in -view_distance..view_distance {
         for x in -view_distance..view_distance {
@@ -208,6 +293,8 @@ pub fn gen_view_chunks(
             if map.get_entity(&pos).is_some() || map.to_gen(&pos) {
                 continue;
             }
+            num_this_frame += 1;
+            if num_this_frame > MAX_PER_FRAME {return;}
             for y in 0..5 {
                 let pos = ChunkId::new(center.x() + x, y, center.z() + z);
                 let entity = commands.spawn((
@@ -233,7 +320,7 @@ pub fn gen_view_chunks(
 pub fn hide_view_chunks(
     mut commands: Commands,
     mut chunks: Query<(Entity, &ChunkId, &mut Visibility)>,
-    player: Query<&Transform, With<FlyCam>>,
+    player: Query<&Transform, With<Player>>,
     view_distance: Res<crate::settings::ViewDistance>,
     map: Res<Map>,
     mut gen_tasks: ResMut<crate::ChunkMeshTasks>,

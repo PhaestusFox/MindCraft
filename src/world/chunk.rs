@@ -192,6 +192,11 @@ impl Chunk {
         use bevy_rapier3d::prelude::*;
         let mut vertexs: Vec<bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>>> = Vec::new();
         let mut indices = Vec::new();
+        let is_solid = self.blocks.iter().filter(|b| !b.is_solid()).count() == 0;
+        if is_solid {
+            const HALF_LENGTH: f32 = CHUNK_SIZE as f32 / 2.;
+            return Some(bevy_rapier3d::prelude::Collider::cuboid(HALF_LENGTH, HALF_LENGTH, HALF_LENGTH));
+        };
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
@@ -238,6 +243,13 @@ impl Chunk {
             }
             Some(bevy_rapier3d::rapier::prelude::SharedShape::trimesh_with_flags(vertexs, indices, TriMeshFlags::MERGE_DUPLICATE_VERTICES).into())
         }
+
+    pub fn set_block(&mut self, block: BlockId, to: BlockType) {
+        if block > CHUNK_SIZE - 1 || block < 0 {
+            return;
+        }
+        self.blocks[(block.y() * CHUNK_AREA + block.z() * CHUNK_SIZE + block.x()) as usize] = to;
+    }
 }
 
 #[derive(Debug, strum_macros::EnumIter, Clone, Copy, PartialEq)]

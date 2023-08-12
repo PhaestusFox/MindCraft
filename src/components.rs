@@ -158,6 +158,14 @@ impl BlockId {
         self.0.z
     }
 
+    pub fn from_translation(translation: Vec3) -> BlockId {
+        BlockId(translation.round().as_ivec3())
+    }
+
+    pub fn to_vec3(&self) -> Vec3 {
+        self.0.as_vec3()
+    }
+
     pub fn get(&self, direction: Direction) -> BlockId {
         match direction {
             Direction::Up => BlockId::new(self.x(), self.y() + 1, self.z()),

@@ -3,6 +3,8 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 use bevy_rapier3d::prelude::*;
+
+use crate::GameState;
 /// Keeps track of mouse motion events, pitch, and yaw
 #[derive(Resource, Default)]
 struct InputState {
@@ -60,7 +62,7 @@ pub struct FlyCam;
 fn toggle_grab_cursor(window: &mut Window) {
     match window.cursor.grab_mode {
         CursorGrabMode::None => {
-            window.cursor.grab_mode = CursorGrabMode::Confined;
+            window.cursor.grab_mode = CursorGrabMode::Locked;
             window.cursor.visible = false;
         }
         _ => {
@@ -195,7 +197,8 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<InputState>()
             .init_resource::<MovementSettings>()
             .init_resource::<KeyBindings>()
-            .add_systems(Startup, (setup_player, initial_grab_cursor))
-            .add_systems(Update, (player_move, player_look, cursor_grab));
+            // .add_systems(Startup, setup_player)
+            .add_systems(OnEnter(GameState::Playing), initial_grab_cursor)
+            .add_systems(Update, (player_move, player_look, cursor_grab).run_if(in_state(GameState::Playing)));
     }
 }

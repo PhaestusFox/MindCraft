@@ -7,6 +7,9 @@ use settings::ViewDistance;
 use textures::TextureHandles;
 use world::{chunk::{Chunk, ChunkGenData}, Map};
 
+
+mod player_controller;
+
 pub mod settings;
 
 mod textures;
@@ -47,17 +50,14 @@ fn main() {
         bevy::diagnostic::EntityCountDiagnosticsPlugin,
         // bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin,
     ));
-    app.add_plugins((textures::TexturePlugin, cam::PlayerPlugin));
+    app.add_plugins((textures::TexturePlugin,
+    cam::PlayerPlugin));
     app.add_systems(Startup, spawn_cube);
-    app.insert_resource(world::WorldDescriptior::new(3));
-    app.add_systems(Startup, world::gen_start_chunks);
     app.add_systems(PreUpdate, components::name_chunks);
     app.add_systems(
         Update,
         (
-            world::gen_view_chunks,
             gen_chunk_tasks.after(world::gen_view_chunks),
-            world::hide_view_chunks,
             add_chunk_meshes,
         ),
     );
@@ -65,6 +65,11 @@ fn main() {
     .init_resource::<ChunkMeshTasks>();
     app.init_resource::<ViewDistance>();
     app.register_type::<ViewDistance>();
+    app.add_plugins(belly::prelude::BellyPlugin);
+    app.add_state::<GameState>();
+    app.add_plugins((menu::MenuPlugin, world::WorldPlugin));
+    app.configure_set(Update, Playing.run_if(not(in_state(GameState::MainMenu))));
+    app.add_plugins(player_controller::PlayerPlugin);
     app.run()
 }
 
@@ -89,7 +94,7 @@ fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res
             BlockType::GoldOre,
             BlockType::IronOre,
             BlockType::CoalOre,
-            BlockType::DeadBush,
+            // BlockType::DeadBush,
             BlockType::Grass,
             BlockType::Water,
         ]
@@ -148,19 +153,24 @@ fn add_chunk_meshes(
             error!("Faild to gen chunk"); continue;};
         let e = map.get_entity(&id).expect("Chunk to be in world");
         if let Some(collider) = data.collider {
-            commands.entity(e).insert(collider);
+            if let Some(mut entity) = commands.get_entity(e){
+                entity.insert(collider);
+            };
         }
         if let Some(mesh) = data.main_mesh {
             let _ = assets.set(id, mesh);
         }
         if let Some(water) = data.water_mesh {
-            commands.entity(e).with_children(|p| {
-                p.spawn(PbrBundle {
-                    mesh: assets.add(water),
-                    material: textures.get_water(),
-                    ..Default::default()
+            if let Some(mut entity) = commands.get_entity(e) {
+                entity.despawn_descendants();
+                entity.with_children(|p| {
+                    p.spawn(PbrBundle {
+                        mesh: assets.add(water),
+                        material: textures.get_water(),
+                        ..Default::default()
+                    });
                 });
-            });
+            };
         }
     }
 }
@@ -171,3 +181,17 @@ fn frame_time(
     let Some(d) = diagnostics.get(bevy::diagnostic::FrameTimeDiagnosticsPlugin::FRAME_TIME) else {return;};
     println!("Frame Time = {:?}", d.average());
 }
+
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy, Hash, States)]
+enum GameState {
+    #[default]
+    MainMenu,
+    EscapeMenu,
+    GenWorld,
+    Playing,
+}
+
+mod menu;
+
+#[derive(Debug, SystemSet, Hash, PartialEq, Eq, Clone, Copy)]
+struct Playing;
