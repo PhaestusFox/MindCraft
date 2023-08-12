@@ -68,6 +68,7 @@ pub fn spawn_player(
             transform: Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
             ..Default::default()
         },
+        Damping{linear_damping: 0.5, angular_damping: 1.},
         PlayerCamera(cam),
     )).with_children(|p| {
         p.spawn((
