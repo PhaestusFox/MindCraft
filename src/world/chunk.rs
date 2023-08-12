@@ -200,9 +200,14 @@ impl Chunk {
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
         Some(mesh)
     }
-
+    
     pub fn gen_collider(&self) -> Option<bevy_rapier3d::prelude::Collider> {
         use bevy_rapier3d::prelude::*;
+        const IND: [[u32; 3]; 2] = [[0, 1, 2], [2, 3, 0]];
+        const SIZE_LENGTH: f32 = 1.0;
+        const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
+        const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
+
         let mut vertexs: Vec<bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>>> = Vec::new();
         let mut indices = Vec::new();
         let is_solid = self.blocks.iter().filter(|b| !b.is_solid()).count() == 0;
@@ -210,6 +215,271 @@ impl Chunk {
             const HALF_LENGTH: f32 = CHUNK_SIZE as f32 / 2.;
             return Some(bevy_rapier3d::prelude::Collider::cuboid(HALF_LENGTH, HALF_LENGTH, HALF_LENGTH));
         };
+        let mut solid_y_planes = [true; CHUNK_SIZE as usize];
+        let mut solid_x_planes = [true; CHUNK_SIZE as usize];
+        let mut solid_z_planes = [true; CHUNK_SIZE as usize];
+        for y in 0..CHUNK_SIZE as usize {
+            for x in 0..CHUNK_SIZE as usize {
+                for z in 0..CHUNK_SIZE as usize {
+                    if !self.blocks[(y * CHUNK_AREA as usize + z * CHUNK_SIZE as usize  + x) as usize].is_solid() {
+                        solid_y_planes[y] = false;
+                        solid_x_planes[x] = false;
+                        solid_z_planes[z] = false;
+                    }
+                }
+            }
+        }
+        if solid_y_planes[0] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            vertexs.extend([
+            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 20
+            [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH],     // 21
+            [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 22
+            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 23
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2]].into();
+                new_pos
+            }));
+        }
+
+        if solid_x_planes[0] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            vertexs.extend([
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 9
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 10
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 11  // 23
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2]].into();
+                new_pos
+            }));
+        }
+
+        if solid_z_planes[0] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            //.  .
+
+            //.  .
+            vertexs.extend([
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH], // 7
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 4
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2]].into();
+                new_pos
+            }));
+        }
+
+        if solid_y_planes[(CHUNK_SIZE - 1) as usize] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            vertexs.extend([
+            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 20
+            [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH],     // 21
+            [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 22
+            [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 23
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1] + CHUNK_SIZE as f32, pos[2]].into();
+                new_pos
+            }));
+        }
+
+        if solid_x_planes[(CHUNK_SIZE - 1) as usize] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            vertexs.extend([
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 9
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 10
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 11  // 23
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + CHUNK_SIZE as f32, pos[1], pos[2]].into();
+                new_pos
+            }));
+        }
+
+        if solid_z_planes[(CHUNK_SIZE - 1) as usize] {
+            indices.extend(
+                IND.map(|mut val| {
+                    val[0] += vertexs.len() as u32;
+                    val[1] += vertexs.len() as u32;
+                    val[2] += vertexs.len() as u32;
+                    val
+                })
+            );
+            //.  .
+
+            //.  .
+            vertexs.extend([
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH], // 7
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 4
+            ].into_iter().map(|pos| {
+                let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2] + CHUNK_SIZE as f32].into();
+                new_pos
+            }));
+        }
+
+        for i in 1..CHUNK_SIZE as usize {
+            // if bellow is not sold
+            if solid_y_planes[i] && !solid_y_planes[i-1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 20
+                [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH],     // 21
+                [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 22
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 23
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1] + i as f32, pos[2]].into();
+                    new_pos
+                }));
+            }
+            // if above is not sold
+            if solid_y_planes[i] && i < (CHUNK_SIZE-1) as usize && !solid_y_planes[i+1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 20
+                [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH],     // 21
+                [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 22
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 23
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1] + (i+1) as f32, pos[2]].into();
+                    new_pos
+                }));
+            }
+
+            // if left is not sold
+            if solid_x_planes[i] && !solid_x_planes[i-1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 9
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 10
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 11  // 23
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + i as f32, pos[1], pos[2]].into();
+                    new_pos
+                }));
+            }
+            // if right not solid
+            if solid_x_planes[i] && i < (CHUNK_SIZE-1) as usize && !solid_x_planes[i+1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32],     // 9
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32],         // 10
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 11  // 23
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0] + (i+1) as f32, pos[1], pos[2]].into();
+                    new_pos
+                }));
+            }
+
+            // if back not solid
+            if solid_z_planes[i] && !solid_z_planes[i-1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH], // 7
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 4
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2] + i as f32].into();
+                    new_pos
+                }));
+            }
+            // if frount not solid
+            if solid_z_planes[i] && i < (CHUNK_SIZE-1) as usize && !solid_z_planes[i+1] {
+                indices.extend(
+                    IND.map(|mut val| {
+                        val[0] += vertexs.len() as u32;
+                        val[1] += vertexs.len() as u32;
+                        val[2] += vertexs.len() as u32;
+                        val
+                    })
+                );
+                vertexs.extend([
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH], // 7
+                    [NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH + CHUNK_SIZE as f32, NEG_HALF_LENGTH],     // 4
+                ].into_iter().map(|pos| {
+                    let new_pos: bevy_rapier3d::na::OPoint<f32, bevy_rapier3d::na::Const<3>> = [pos[0], pos[1], pos[2] + (i+1) as f32].into();
+                    new_pos
+                }));
+            }
+        }
+        
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
@@ -220,16 +490,36 @@ impl Chunk {
                         _ => {}
                     }
                     for direction in Direction::iter() {
+                        match direction {
+                            Direction::Up |
+                            Direction::Down => {
+                                if solid_y_planes[y as usize] {
+                                    continue;
+                                }
+                            },
+                            Direction::Left |
+                            Direction::Right => {
+                                if solid_x_planes[y as usize] {
+                                    continue;
+                                }
+                            },
+                            Direction::Forward |
+                            Direction::Back => {
+                                if solid_z_planes[y as usize] {
+                                    continue;
+                                }
+                            },
+                        }
+
                         if self.get_block(current.get(direction)).is_solid() {
                             continue;
                         }
-                        let ind = [[0, 1, 2], [2, 3, 0]];
                         let plane = direction.perp();
                         if self.get_block(current.get(plane.rev())).is_solid() && !self.get_block(current.get(plane.rev()).get(direction)).is_solid() {
                             continue;
                         }
                         indices.extend(
-                            ind.map(|mut val| {
+                            IND.map(|mut val| {
                                 val[0] += vertexs.len() as u32;
                                 val[1] += vertexs.len() as u32;
                                 val[2] += vertexs.len() as u32;
