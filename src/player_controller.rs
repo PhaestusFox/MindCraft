@@ -23,7 +23,7 @@ fn noclip(
     if input.just_pressed(KeyCode::F12) {
         for mut rb in &mut players {
             let next = match *rb {
-                RigidBody::Dynamic => RigidBody::Fixed,
+                RigidBody::Dynamic => RigidBody::KinematicPositionBased,
                 _ => RigidBody::Dynamic,
             };
             *rb = next;
