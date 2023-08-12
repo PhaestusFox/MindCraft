@@ -9,10 +9,25 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
-        .add_systems(Update, (player_look, player_move, player_laser, set_selected).in_set(Playing))
+        .add_systems(Update, (noclip, player_look, player_move, player_laser, set_selected).in_set(Playing))
         .add_systems(OnExit(GameState::GenWorld), set_play_ground)
         .init_resource::<InputState>()
         .init_resource::<SelectedBlock>();
+    }
+}
+
+fn noclip(
+    mut players: Query<&mut RigidBody, With<Player>>,
+    input: Res<Input<KeyCode>>,
+) {
+    if input.just_pressed(KeyCode::F12) {
+        for mut rb in &mut players {
+            let next = match *rb {
+                RigidBody::Dynamic => RigidBody::Fixed,
+                _ => RigidBody::Dynamic,
+            };
+            *rb = next;
+        }
     }
 }
 
