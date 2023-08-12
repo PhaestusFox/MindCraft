@@ -297,6 +297,8 @@ impl BlockType {
                 ],
                 Direction::Right => [
                     // Right face
+                    // . .
+                    // . .
                     [HALF_LENGTH, NEG_HALF_LENGTH - len, HALF_LENGTH], // 13
                     [HALF_LENGTH, NEG_HALF_LENGTH - len, NEG_HALF_LENGTH], // 14
                     [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 15

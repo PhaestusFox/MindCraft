@@ -7,6 +7,8 @@ use settings::ViewDistance;
 use textures::TextureHandles;
 use world::{chunk::{Chunk, ChunkGenData}, Map};
 
+use crate::prelude::CHUNK_SIZE;
+
 
 mod player_controller;
 
@@ -152,25 +154,35 @@ fn add_chunk_meshes(
         let Some(data) = futures_lite::future::block_on(task.cancel()).expect("Is finished") else {
             error!("Faild to gen chunk"); continue;};
         let e = map.get_entity(&id).expect("Chunk to be in world");
+        let Some(mut entity) = commands.get_entity(e) else {trace!("chunk entity not it world"); continue;};
+        entity.despawn_descendants();
         if let Some(collider) = data.collider {
-            if let Some(mut entity) = commands.get_entity(e){
-                entity.insert(collider);
-            };
+            entity.with_children(|p| {
+                p.spawn((if collider.raw.is::<bevy_rapier3d::rapier::prelude::Cuboid>() {
+                    SpatialBundle{
+                        transform: Transform::from_translation(Vec3::splat((CHUNK_SIZE as f32 / 2.) - 0.5)),
+                        ..Default::default()
+                    }
+                } else {
+                    SpatialBundle::default()
+                },
+                collider,
+                Name::new("collider"),
+            ));
+            });
         }
         if let Some(mesh) = data.main_mesh {
             let _ = assets.set(id, mesh);
         }
         if let Some(water) = data.water_mesh {
-            if let Some(mut entity) = commands.get_entity(e) {
-                entity.despawn_descendants();
-                entity.with_children(|p| {
-                    p.spawn(PbrBundle {
-                        mesh: assets.add(water),
-                        material: textures.get_water(),
-                        ..Default::default()
-                    });
-                });
-            };
+            entity.with_children(|p| {
+                p.spawn((PbrBundle {
+                    mesh: assets.add(water),
+                    material: textures.get_water(),
+                    ..Default::default()
+                },
+                Name::new("water")));
+            });
         }
     }
 }

@@ -137,7 +137,7 @@ impl MapInternal {
     }
 
     pub fn contains_chunk(&self, id: &ChunkId) -> bool {
-        self.chunks.contains_key(id) || self.to_gen.contains_key(id)
+        self.chunks.contains_key(id) || self.can_mesh.contains(id)
     }
 
     pub fn remove_chunk(&mut self, id: &ChunkId) {

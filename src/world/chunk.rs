@@ -22,6 +22,19 @@ pub struct ChunkGenData {
 
 impl Chunk {
     pub async fn make_mesh(id: ChunkId, map: super::Map, atlas_map: TextureHandles) -> Option<ChunkGenData> {
+            // let mut all_gened = false;
+            // while !all_gened {
+            //     all_gened = true;
+            //     let map = map.0.read().unwrap();
+            //     for neighbor in id.neighbours() {
+            //         if !map.contains_chunk(&neighbor) {
+            //             all_gened = false;
+            //             drop(map);
+            //             std::thread::sleep(std::time::Duration::from_millis(100));
+            //             break;
+            //         }
+            //     }
+            // }
             let map = map.0.read().unwrap();
             let chunk = map.get_chunk(&id)?;
             Some(ChunkGenData { main_mesh: chunk.gen_mesh(&atlas_map, &map), water_mesh: chunk.gen_water_mesh(&atlas_map, &map), collider: chunk.gen_collider() })
