@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::hash::Hasher;
 
 use bevy::prelude::*;
 
@@ -22,6 +23,14 @@ impl From<Vec3> for ChunkId {
 impl ChunkId {
     pub const fn new(x: i32, y: i32, z: i32) -> ChunkId {
         ChunkId(IVec3 { x, y, z })
+    }
+
+    pub fn to_u128(self) -> u128 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        hasher.write_i32(self.x());
+        hasher.write_i32(self.y());
+        hasher.write_i32(self.z());
+        hasher.finish() as u128
     }
 
     pub const fn x(&self) -> i32 {
@@ -83,19 +92,6 @@ impl std::ops::Add<BlockId> for ChunkId {
         rhs.0.y += self.y() * CHUNK_SIZE;
         rhs.0.z += self.z() * CHUNK_SIZE;
         rhs
-    }
-}
-
-impl From<ChunkId> for bevy::asset::HandleId {
-    fn from(value: ChunkId) -> Self {
-        use std::hash::Hash;
-        use std::hash::Hasher;
-        let mut hasher = std::collections::hash_map::DefaultHasher::default();
-        value.hash(&mut hasher);
-        bevy::asset::HandleId::Id(
-            uuid::uuid!("0c7f7a1b-f6ca-4006-8032-d3a0bbdcb659"),
-            hasher.finish(),
-        )
     }
 }
 

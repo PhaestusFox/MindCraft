@@ -1,5 +1,5 @@
 use crate::prelude::Direction;
-use bevy::{prelude::*, render::mesh::VertexAttributeValues, utils::HashMap};
+use bevy::{prelude::*, render::{mesh::VertexAttributeValues, render_asset::RenderAssetUsages}, utils::HashMap};
 
 #[derive(Debug, Default, Clone, Copy, strum_macros::EnumIter, strum_macros::EnumCount, PartialEq, Eq, Hash, strum_macros::FromRepr)]
 pub enum BlockType {
@@ -340,13 +340,13 @@ pub fn make_test_block_mesh(block_index: usize, atlas_size: usize) -> Mesh {
             [uv_x_0, uv_y_0],
         ]);
     }
-    let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList);
+    let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList, RenderAssetUsages::all());
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(get_test_vertexes()),
     );
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs));
-    mesh.set_indices(Some(bevy::render::mesh::Indices::U16(get_test_indices())));
+    mesh.insert_indices(bevy::render::mesh::Indices::U16(get_test_indices()));
     mesh
 }
 

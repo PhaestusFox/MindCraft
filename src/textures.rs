@@ -1,4 +1,4 @@
-use bevy::{ecs::system::Command, prelude::*, utils::HashMap};
+use bevy::{ecs::system::Command, prelude::*, render::render_asset::RenderAssetUsages, utils::HashMap};
 use indexmap::IndexSet;
 
 use crate::blocks::BlockType;
@@ -9,7 +9,7 @@ impl Plugin for TexturePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            build_texture_atlas.run_if(resource_exists::<TextureAtlasBuilder>()),
+            build_texture_atlas.run_if(resource_exists::<TextureAtlasBuilder>),
         );
         app.init_resource::<TextureHandles>();
     }
@@ -31,7 +31,7 @@ impl Command for MakeTextureAtlas {
         let asset_server = world.resource::<AssetServer>();
         for block in self.0.iter() {
             for path in block.get_texture_paths() {
-                let handle = asset_server.load::<_, &str>(path);
+                let handle = asset_server.load::<_>(*path);
                 let temp = handle.clone_weak();
                 need_textures.insert(handle);
                 let map: &mut Vec<usize> = map.entry(*block).or_default();
@@ -88,11 +88,15 @@ impl TextureHandles {
     }
 }
 
+#[derive(Resource)]
+struct MainTexture(Handle<Image>);
+
 impl FromWorld for TextureHandles {
     fn from_world(world: &mut World) -> Self {
         let main_image = world
             .resource_mut::<Assets<Image>>()
-            .get_handle("MainAtlas");
+            .reserve_handle();
+        world.insert_resource(MainTexture(main_image.clone()));
         let texture = world
             .resource_mut::<Assets<StandardMaterial>>()
             .add(StandardMaterial {
@@ -130,11 +134,9 @@ fn build_texture_atlas(
     atlas_builder: Res<TextureAtlasBuilder>,
     asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
+    main_image: Res<MainTexture>,
 ) {
-    if let bevy::asset::LoadState::Loaded =
-        asset_server.get_group_load_state(atlas_builder.0.iter().map(|h| h.id()))
-    {
-    } else {
+    if !atlas_builder.0.iter().map(|handle| {asset_server.is_loaded_with_dependencies(handle.id())}).fold(true, |acc, mk| acc && mk) {
         return;
     }
     let first = images
@@ -143,7 +145,7 @@ fn build_texture_atlas(
     let atlas_size = ((atlas_builder.0.len() + 1) as f32).sqrt().ceil() as usize;
     let width = first.texture_descriptor.size.width as usize;
     let format = first.texture_descriptor.format;
-    let pixed_size = format.block_size(None).unwrap() as usize;
+    let pixed_size = format.block_copy_size(None).unwrap() as usize;
     let mut atlas_data = vec![0; (atlas_size * atlas_size * width * width * pixed_size) as usize];
     let mut has_water = false;
     'y: for y in 0..atlas_size {
@@ -181,13 +183,14 @@ fn build_texture_atlas(
         height: (width * atlas_size) as u32,
         depth_or_array_layers: 1,
     };
-    let _ = images.set(
-        "MainAtlas",
+    let _ = images.insert(
+        main_image.0.id(),
         Image::new(
             size,
             bevy::render::render_resource::TextureDimension::D2,
             atlas_data,
             format,
+            RenderAssetUsages::all()
         ),
     );
     commands.remove_resource::<TextureAtlasBuilder>();

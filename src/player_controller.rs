@@ -18,7 +18,7 @@ impl Plugin for PlayerPlugin {
 
 fn noclip(
     mut players: Query<&mut RigidBody, With<Player>>,
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
 ) {
     if input.just_pressed(KeyCode::F12) {
         for mut rb in &mut players {
@@ -115,7 +115,7 @@ fn player_look(
         for (mut transform, player_camera) in query.iter_mut() {
             let Ok(mut camera_transform) = cams.get_mut(player_camera.0) else {error!("Player has no camera;"); continue;};
             let (_, mut pitch, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
-            for ev in state.reader_motion.iter(&motion) {
+            for ev in state.reader_motion.read(&motion) {
                 let (mut yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
                 match window.cursor.grab_mode {
                     CursorGrabMode::None => (),
@@ -142,7 +142,7 @@ fn player_look(
 
 /// Handles keyboard input and movement
 fn player_move(
-    keys: Res<Input<KeyCode>>,
+    keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     primary_window: Query<&Window, With<PrimaryWindow>>,
     settings: Res<MovementSettings>,
@@ -188,7 +188,7 @@ fn player_move(
 }
 
 fn player_laser(
-    click: Res<Input<MouseButton>>,
+    click: Res<ButtonInput<MouseButton>>,
     players: Query<&PlayerCamera, With<Player>>,
     cameras: Query<&GlobalTransform, With<Camera>>,
     context: Res<RapierContext>,
@@ -215,26 +215,26 @@ fn player_laser(
 }
 
 fn set_selected(
-    input: Res<Input<KeyCode>>,
+    input: Res<ButtonInput<KeyCode>>,
     mut mouse: EventReader<MouseWheel>,
     mut selected: ResMut<SelectedBlock>,
 ) {
     for key in input.get_just_pressed() {
         match key {
-            KeyCode::Key1 => selected.set(BlockType::Air),
-            KeyCode::Key2 => selected.set(BlockType::Bedrock),
-            KeyCode::Key3 => selected.set(BlockType::CoalOre),
-            KeyCode::Key4 => selected.set(BlockType::Dirt),
-            KeyCode::Key5 => selected.set(BlockType::Grass),
-            KeyCode::Key6 => selected.set(BlockType::GoldOre),
-            KeyCode::Key7 => selected.set(BlockType::IronOre),
-            KeyCode::Key8 => selected.set(BlockType::Gravel),
-            KeyCode::Key9 => selected.set(BlockType::Sand),
-            KeyCode::Key0 => selected.set(BlockType::Stone),
+            KeyCode::Digit1 => selected.set(BlockType::Air),
+            KeyCode::Digit2 => selected.set(BlockType::Bedrock),
+            KeyCode::Digit3 => selected.set(BlockType::CoalOre),
+            KeyCode::Digit4 => selected.set(BlockType::Dirt),
+            KeyCode::Digit5 => selected.set(BlockType::Grass),
+            KeyCode::Digit6 => selected.set(BlockType::GoldOre),
+            KeyCode::Digit7 => selected.set(BlockType::IronOre),
+            KeyCode::Digit8 => selected.set(BlockType::Gravel),
+            KeyCode::Digit9 => selected.set(BlockType::Sand),
+            KeyCode::Digit0 => selected.set(BlockType::Stone),
             _ => {}
         }
     }
-    for mouse in mouse.iter() {
+    for mouse in mouse.read() {
         if mouse.y >= 1. {
             let mut next = selected.get() as usize + 1;
             if next >= BlockType::COUNT {

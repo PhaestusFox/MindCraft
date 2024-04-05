@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{prelude::*, render::mesh::Indices};
+use bevy::{prelude::*, render::{mesh::Indices, render_asset::RenderAssetUsages}};
 use bevy_rapier3d::prelude::Collider;
 use noise::NoiseFn;
 use rand::{Rng, SeedableRng};
@@ -15,7 +15,7 @@ pub struct Chunk {
 }
 
 pub struct ChunkGenData {
-    pub main_mesh: Option<Mesh>,
+    pub main_mesh: Mesh,
     pub water_mesh: Option<Mesh>,
     pub collider: Option<Collider>,
 }
@@ -108,7 +108,7 @@ impl Chunk {
         self.blocks[(pos.y() * CHUNK_AREA + pos.z() * CHUNK_SIZE + pos.x()) as usize]
     }
 
-    fn gen_mesh(&self, atlas_map: &TextureHandles, map: &MapInternal) -> Option<Mesh> {
+    fn gen_mesh(&self, atlas_map: &TextureHandles, map: &MapInternal) -> Mesh {
         let mut positions = Vec::new();
         let mut uvs = Vec::new();
         let mut indices = Vec::new();
@@ -143,16 +143,17 @@ impl Chunk {
             }
         }
         if indices.is_empty() {
-            return None;
+            return Mesh::new(
+                bevy::render::render_resource::PrimitiveTopology::TriangleList, RenderAssetUsages::all());
         }
         let mut mesh = Mesh::new(
-            bevy::render::render_resource::PrimitiveTopology::TriangleList);
-        mesh.set_indices(Some(Indices::U32(indices)));
+            bevy::render::render_resource::PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+        mesh.insert_indices(Indices::U32(indices));
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0., 1., 0.]; positions.len()]);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, color);
         mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-        Some(mesh)
+        mesh
     }
 
     fn gen_water_mesh(&self, atlas_map: &TextureHandles, map: &MapInternal) -> Option<Mesh> {
@@ -192,8 +193,8 @@ impl Chunk {
             return None;
         }
         let mut mesh = Mesh::new(
-            bevy::render::render_resource::PrimitiveTopology::TriangleList);
-        mesh.set_indices(Some(Indices::U32(indices)));
+            bevy::render::render_resource::PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+        mesh.insert_indices(Indices::U32(indices));
         mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0., 1., 0.]; positions.len()]);
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
         mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, color);

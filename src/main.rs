@@ -28,18 +28,13 @@ mod components;
 fn main() {
     let mut app = App::new();
     app.add_plugins((
-        DefaultPlugins.build()
-        // .disable::<bevy::log::LogPlugin>()
-        .set(AssetPlugin{
-            watch_for_changes: bevy::asset::ChangeWatcher::with_delay(std::time::Duration::from_millis(50)),
-            ..Default::default()
-        }),
+        DefaultPlugins.build(),
         EditorPlugin::default(),
         RapierPhysicsPlugin::<()>::default(),
     ));
     #[cfg(debug_assertions)]
     app.add_systems(FixedUpdate, frame_time);
-    app.insert_resource(FixedTime::new_from_secs(1.));
+    app.insert_resource(Time::<Fixed>::from_hz(1.));
     #[cfg(debug_assertions)]
     app.add_plugins((
         // it is fast unless debug rendering it on, it is too many lines so im only going to show the
@@ -67,11 +62,13 @@ fn main() {
     .init_resource::<ChunkMeshTasks>();
     app.init_resource::<ViewDistance>();
     app.register_type::<ViewDistance>();
-    app.add_plugins(belly::prelude::BellyPlugin);
-    app.add_state::<GameState>();
-    app.add_plugins((menu::MenuPlugin, world::WorldPlugin));
-    app.configure_set(Update, Playing.run_if(not(in_state(GameState::MainMenu))));
+    // app.add_plugins(belly::prelude::BellyPlugin);
+    app.insert_state(GameState::GenWorld);
+    // app.add_plugins((menu::MenuPlugin));
+    app.add_plugins(world::WorldPlugin);
+    app.configure_sets(Update, Playing.run_if(not(in_state(GameState::MainMenu))));
     app.add_plugins(player_controller::PlayerPlugin);
+    app.add_plugins(bevy_console::ConsolePlugin);
     app.run()
 }
 
@@ -171,9 +168,7 @@ fn add_chunk_meshes(
             ));
             });
         }
-        if let Some(mesh) = data.main_mesh {
-            let _ = assets.set(id, mesh);
-        }
+        let _ = assets.insert(Handle::weak_from_u128(id.to_u128()), data.main_mesh);
         if let Some(water) = data.water_mesh {
             entity.with_children(|p| {
                 p.spawn((PbrBundle {
@@ -190,20 +185,20 @@ fn add_chunk_meshes(
 fn frame_time(
     diagnostics: Res<bevy::diagnostic::DiagnosticsStore>,
 ) {
-    let Some(d) = diagnostics.get(bevy::diagnostic::FrameTimeDiagnosticsPlugin::FRAME_TIME) else {return;};
+    let Some(d) = diagnostics.get(&bevy::diagnostic::FrameTimeDiagnosticsPlugin::FRAME_TIME) else {return;};
     println!("Frame Time = {:?}", d.average());
 }
 
 #[derive(Default, Debug, PartialEq, Eq, Clone, Copy, Hash, States)]
 enum GameState {
-    #[default]
     MainMenu,
     EscapeMenu,
+    #[default]
     GenWorld,
     Playing,
 }
 
-mod menu;
+//mod menu;
 
 #[derive(Debug, SystemSet, Hash, PartialEq, Eq, Clone, Copy)]
 struct Playing;

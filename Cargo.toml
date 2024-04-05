@@ -7,8 +7,8 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = {version = "0.11", features = ["trace"]}
-bevy_editor_pls = {git = "https://github.com/jakobhellermann/bevy_editor_pls.git"}
+bevy = {version = "0.13", features = ["trace"]}
+bevy_editor_pls = "0.8"
 bevy_rapier3d = { version = "*", features = [ "simd-stable", "debug-render-3d", "parallel" ] }
 rand = "0.8"
 strum_macros = "*"
@@ -16,9 +16,11 @@ strum = "*"
 noise = "*"
 indexmap = "*"
 uuid = "*"
-bevy_diagnostics_explorer = {git = "https://github.com/PhaestusFox/bevy-diagnostics-explorer.git"}
+# bevy_diagnostics_explorer = {git = "https://github.com/PhaestusFox/bevy-diagnostics-explorer.git"}
 futures-lite = "*"
-belly = {git = "https://github.com/jkb0o/belly.git", branch = "bevy-0.11"}
+# belly = {git = "https://github.com/jkb0o/belly.git", branch = "bevy-0.11"}
+bevy_console = {git = "https://github.com/RichoDemus/bevy-console.git"}
+clap = "*"
 
 [profile.dev.package."*"]
 opt-level = 3

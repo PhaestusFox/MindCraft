@@ -6,10 +6,13 @@ use self::chunk::Chunk;
 
 pub mod chunk;
 
+mod world_commands;
+
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
+        world_commands::setup(app);
         app.add_systems(OnEnter(GameState::GenWorld), gen_start_chunks)
         .add_systems(Update, (gen_view_chunks, hide_view_chunks).in_set(Playing))
         .insert_resource(WorldDescriptior::new(3))
@@ -68,6 +71,18 @@ impl MapInternal {
         chunk.get_block(block)
     }
 
+    pub fn clear_chunk(&mut self, chunk_id: ChunkId) {
+        let Some(chunk) = self.get_chunk_mut(&chunk_id) else {
+            self.chunks.insert(chunk_id, Chunk { id: chunk_id, entity: None, blocks: [BlockType::Air; CHUNK_VOL as usize] });
+            return;
+        };
+        chunk.blocks = [BlockType::Air; CHUNK_VOL as usize];
+        self.can_mesh.insert(chunk_id);
+        for n in chunk_id.neighbours() {
+            self.can_mesh.insert(n);
+        }
+    }
+
     pub fn set_block(&mut self, chunk_id: ChunkId, block: BlockId, to: BlockType) {
         let Some(chunk) = self.get_chunk_mut(&chunk_id) else {
             return;
@@ -103,6 +118,13 @@ impl MapInternal {
 
     pub fn get_entity(&self, id: &ChunkId) -> Option<Entity> {
         self.chunks.get(id).and_then(|e| e.entity)
+    }
+
+    pub fn regen_chunk(&mut self, id: ChunkId) {
+        let Some(old) = self.chunks.get(&id) else {return;};
+        let mut chunk = chunk::Chunk::new(id, &self.descriptior.rng, self.descriptior.seed);
+        chunk.entity = old.entity;
+        self.chunks.insert(id, chunk);
     }
 
     fn gen_chunk(&self, id: ChunkId) -> Option<Chunk> {
@@ -258,7 +280,7 @@ pub fn gen_start_chunks(
                             (z * CHUNK_SIZE) as f32,
                         )),
                         material: matt.get_atlas(),
-                        mesh: asset_server.get_handle(id),
+                        mesh: Handle::weak_from_u128(id.to_u128()),
                         ..Default::default()
                     },
                     id,
@@ -278,6 +300,7 @@ pub fn gen_view_chunks(
     matt: Res<TextureHandles>,
     asset_server: Res<AssetServer>,
     view_distance: Res<crate::settings::ViewDistance>,
+    meshes: Res<Assets<Mesh>>,
 ) {
     let player = player.single().translation;
     let center = ChunkId::new(
@@ -305,7 +328,7 @@ pub fn gen_view_chunks(
                             (pos.z() * CHUNK_SIZE) as f32,
                         )),
                         material: matt.get_atlas(),
-                        mesh: asset_server.get_handle(pos),
+                        mesh: Handle::weak_from_u128(pos.to_u128()),
                         ..Default::default()
                     },
                     pos,
