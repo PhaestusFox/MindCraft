@@ -9,27 +9,47 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
-        .add_systems(Update, (noclip, player_look, player_move, player_laser, set_selected).in_set(Playing))
+        .add_systems(Update, (noclip, player_look, player_laser, set_selected).in_set(Playing))
+        .add_systems(Update, player_move.in_set(Playing).run_if(in_state(PlayerMode::Normal)))
+        .add_systems(Update, noclip_move.in_set(Playing).run_if(in_state(PlayerMode::NoClip)))
         .add_systems(OnExit(GameState::GenWorld), set_play_ground)
         .init_resource::<InputState>()
-        .init_resource::<SelectedBlock>();
+        .init_resource::<SelectedBlock>()
+        .init_state::<PlayerMode>();
     }
+}
+
+#[derive(States, Default, Debug, Hash, PartialEq, Eq, Clone)]
+enum PlayerMode {
+    #[default]
+    Normal,
+    NoClip,
 }
 
 fn noclip(
     mut players: Query<&mut RigidBody, With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
+    state: Res<State<PlayerMode>>,
+    mut next: ResMut<NextState<PlayerMode>>
 ) {
     if input.just_pressed(KeyCode::F12) {
-        for mut rb in &mut players {
-            let next = match *rb {
-                RigidBody::Dynamic => RigidBody::KinematicPositionBased,
-                _ => RigidBody::Dynamic,
-            };
-            *rb = next;
+        match state.get() {
+            PlayerMode::Normal => {
+                for mut p in &mut players {
+                    *p = RigidBody::KinematicPositionBased;
+                }
+                next.set(PlayerMode::NoClip);
+            },
+            PlayerMode::NoClip => {
+                for mut p in &mut players {
+                    *p = RigidBody::Dynamic;
+                }
+                next.set(PlayerMode::Normal);
+            },
         }
     }
 }
+
 
 fn set_play_ground(
     mut players: Query<&mut Transform, With<Player>>,
@@ -38,7 +58,7 @@ fn set_play_ground(
     for mut player in &mut players {
         let pos = BlockId::from_translation(player.translation);
         player.translation = pos.to_vec3();
-        player.translation.y = (map.get_max_hight(pos) + 1) as f32;
+        player.translation.y = (map.get_max_hight(pos) + 100) as f32;
     }
 }
 
@@ -76,8 +96,9 @@ pub fn spawn_player(
     }).id();
 
     commands.spawn((
-        // RigidBody::Dynamic,
+        RigidBody::Dynamic,
         Player,
+        ExternalImpulse::default(),
         LockedAxes::ROTATION_LOCKED,
         SpatialBundle{
             transform: Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
@@ -147,7 +168,52 @@ fn player_move(
     primary_window: Query<&Window, With<PrimaryWindow>>,
     settings: Res<MovementSettings>,
     key_bindings: Res<KeyBindings>,
-    mut query: Query<&mut Transform, With<Player>>,
+    mut query: Query<(&mut ExternalImpulse, &Transform), With<Player>>,
+) {
+    if let Ok(window) = primary_window.get_single() {
+        for (mut impulse, transform) in query.iter_mut() {
+            let mut velocity = Vec3::ZERO;
+            let local_z = transform.local_z();
+            let forward = -Vec3::new(local_z.x, 0., local_z.z);
+            let right = Vec3::new(local_z.z, 0., -local_z.x);
+
+            for key in keys.get_pressed() {
+                match window.cursor.grab_mode {
+                    CursorGrabMode::None => (),
+                    _ => {
+                        let key = *key;
+                        if key == key_bindings.move_forward {
+                            velocity += forward;
+                        } else if key == key_bindings.move_backward {
+                            velocity -= forward;
+                        } else if key == key_bindings.move_left {
+                            velocity -= right; 
+                        } else if key == key_bindings.move_right {
+                            velocity += right;
+                        } else if key == key_bindings.move_ascend {
+                            velocity += Vec3::Y * 10.;
+                        } else if key == key_bindings.move_descend {
+                            velocity -= Vec3::Y * 10.;
+                        }
+                    }
+                }
+
+                impulse.impulse = velocity * time.delta_seconds() * settings.speed
+            }
+        }
+    } else {
+        warn!("Primary window not found for `player_move`!");
+    }
+}
+
+/// Handles keyboard input and movement
+fn noclip_move(
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
+    settings: Res<MovementSettings>,
+    key_bindings: Res<KeyBindings>,
+    mut query: Query<(&mut Transform), With<Player>>,
 ) {
     if let Ok(window) = primary_window.get_single() {
         for mut transform in query.iter_mut() {
@@ -166,7 +232,7 @@ fn player_move(
                         } else if key == key_bindings.move_backward {
                             velocity -= forward;
                         } else if key == key_bindings.move_left {
-                            velocity -= right;
+                            velocity -= right; 
                         } else if key == key_bindings.move_right {
                             velocity += right;
                         } else if key == key_bindings.move_ascend {
@@ -176,8 +242,6 @@ fn player_move(
                         }
                     }
                 }
-
-                velocity = velocity.normalize_or_zero();
 
                 transform.translation += velocity * time.delta_seconds() * settings.speed
             }

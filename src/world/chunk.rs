@@ -219,7 +219,6 @@ impl Chunk {
             return None;
         };
 
-        let mut visited = [0; CHUNK_VOL as usize];
         let mut is_solid = [0; CHUNK_VOL as usize];
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
@@ -251,22 +250,42 @@ impl Chunk {
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 for z in 0..CHUNK_SIZE {
-                    let mut len = [0; 6];
+                    let mut length = [0; 6];
                     let mut width = [0; 6];
-                    for z in z..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in z..CHUNK_SIZE {
+                        let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Up as u8) > 0 {
-                            len[Direction::Up as usize] += 1;
                             width[Direction::Up as usize] = 1;
+                            length[Direction::Up as usize] += 1;
                             is_solid[index] ^= 1 << Direction::Up as u8;
+                        } else if length[Direction::Up as usize] > 0 {
+                            'out: for x in x+1..CHUNK_SIZE {
+                                let mut len = 0;
+                                for i in z..CHUNK_SIZE {
+                                    let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                                    if (is_solid[index] & 1 << Direction::Up as u8) > 0 {
+                                        len += 1;
+                                    } else if len >= length[Direction::Up as usize] {
+                                        width[Direction::Up as usize] += 1;
+                                        for i in z..z+length[Direction::Up as usize] {
+                                            let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                                            is_solid[index] ^= 1 << Direction::Up as u8;
+                                        }
+                                        break;
+                                    } else {
+                                        break 'out;
+                                    }
+                                }
+                            }
+                            break;
                         } else {
                             break;
                         }
                     }
-                    for z in z..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in z..CHUNK_SIZE {
+                        let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Down as u8) > 0 {
-                            len[Direction::Down as usize] += 1;
+                            length[Direction::Down as usize] += 1;
                             width[Direction::Down as usize] = 1;
                             is_solid[index] ^= 1 << Direction::Down as u8;
                         } else {
@@ -274,20 +293,20 @@ impl Chunk {
                         }
                     }
 
-                    for y in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in y..CHUNK_SIZE {
+                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Left as u8) > 0 {
-                            len[Direction::Left as usize] += 1;
+                            length[Direction::Left as usize] += 1;
                             width[Direction::Left as usize] = 1;
                             is_solid[index] ^= 1 << Direction::Left as u8;
                         } else {
                             break;
                         }
                     }
-                    for y in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in y..CHUNK_SIZE {
+                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Right as u8) > 0 {
-                            len[Direction::Right as usize] += 1;
+                            length[Direction::Right as usize] += 1;
                             width[Direction::Right as usize] = 1;
                             is_solid[index] ^= 1 << Direction::Right as u8;
                         } else {
@@ -296,10 +315,10 @@ impl Chunk {
                     }
 
 
-                    for y in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in y..CHUNK_SIZE {
+                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Forward as u8) > 0 {
-                            len[Direction::Forward as usize] += 1;
+                            length[Direction::Forward as usize] += 1;
                             width[Direction::Forward as usize] = 1;
                             is_solid[index] ^= 1 << Direction::Forward as u8;
                         } else {
@@ -307,10 +326,10 @@ impl Chunk {
                         }
                     }
 
-                    for y in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + y * CHUNK_AREA) as usize;
+                    for i in y..CHUNK_SIZE {
+                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Back as u8) > 0 {
-                            len[Direction::Back as usize] += 1;
+                            length[Direction::Back as usize] += 1;
                             width[Direction::Back as usize] = 1;
                             is_solid[index] ^= 1 << Direction::Back as u8;
                         } else {
@@ -319,10 +338,10 @@ impl Chunk {
                     }
 
                     for i in Direction::iter() {
-                        if len[i as usize] > 0 {
+                        if length[i as usize] > 0 {
                             indices.push(IND[1].map(|i| i + vertexs.len() as u32));
                             indices.push(IND[0].map(|i| i + vertexs.len() as u32));
-                            for v in i.collider_verts(len[i as usize], width[i as usize]).map(|v| {
+                            for v in i.collider_verts(length[i as usize], width[i as usize]).map(|v| {
                                 v + Vec3::new(x as f32, y as f32, z as f32)
                             }).into_iter() {
                                 vertexs.push(v.into());
@@ -378,6 +397,8 @@ impl Direction {
     }
 
     fn collider_verts(&self, len: i32, width: i32) -> [Vec3; 4] {
+        assert!(len > 0);
+        assert!(width > 0);
         match self {
             Direction::Up => {
                 [
