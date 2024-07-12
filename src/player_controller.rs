@@ -76,7 +76,7 @@ pub fn spawn_player(
     }).id();
 
     commands.spawn((
-        RigidBody::Dynamic,
+        // RigidBody::Dynamic,
         Player,
         LockedAxes::ROTATION_LOCKED,
         SpatialBundle{
