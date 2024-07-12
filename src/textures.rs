@@ -1,4 +1,4 @@
-use bevy::{ecs::system::Command, prelude::*, render::render_asset::RenderAssetUsages, utils::HashMap};
+use bevy::{ecs::world::Command, prelude::*, render::render_asset::RenderAssetUsages, utils::HashMap};
 use indexmap::IndexSet;
 
 use crate::blocks::BlockType;

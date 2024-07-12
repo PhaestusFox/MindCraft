@@ -6,13 +6,13 @@ use self::chunk::Chunk;
 
 pub mod chunk;
 
-mod world_commands;
+// mod world_commands;
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        world_commands::setup(app);
+        // world_commands::setup(app);
         app.add_systems(OnEnter(GameState::GenWorld), gen_start_chunks)
         .add_systems(Update, (gen_view_chunks, hide_view_chunks).in_set(Playing))
         .insert_resource(WorldDescriptior::new(3))

@@ -7,9 +7,9 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = {version = "0.13", features = ["trace"]}
-bevy_editor_pls = "0.8"
-bevy_rapier3d = { version = "*", features = [ "simd-stable", "debug-render-3d", "parallel" ] }
+bevy = {version = "0.14", features = ["trace"]}
+# bevy_editor_pls = "0.8"
+bevy_rapier3d = { version = "0.27.0", features = [ "simd-stable", "debug-render-3d", "parallel" ] }
 rand = "0.8"
 strum_macros = "*"
 strum = "*"
@@ -19,7 +19,7 @@ uuid = "*"
 # bevy_diagnostics_explorer = {git = "https://github.com/PhaestusFox/bevy-diagnostics-explorer.git"}
 futures-lite = "*"
 # belly = {git = "https://github.com/jkb0o/belly.git", branch = "bevy-0.11"}
-bevy_console = {git = "https://github.com/RichoDemus/bevy-console.git"}
+# bevy_console = {git = "https://github.com/RichoDemus/bevy-console.git"}
 clap = "*"
 
 [profile.dev.package."*"]
@@ -27,3 +27,7 @@ opt-level = 3
 
 [profile.release]
 codegen-units = 1
+
+[patch.crates-io]
+# bevy_editor_pls = { git = "https://github.com/zhaop/bevy_editor_pls.git", rev = "340a0e2cb1fa96b512e91ce35cd072059b066346" }
+bevy_rapier3d = {path = "D:\\deps/bevy_rapier/bevy_rapier3d"}

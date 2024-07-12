@@ -1,4 +1,4 @@
-use bevy::{prelude::*, window::{PrimaryWindow, CursorGrabMode}, ecs::event::ManualEventReader, input::mouse::{MouseMotion, MouseWheel}};
+use bevy::{color::palettes::css::BLUE, ecs::event::ManualEventReader, input::mouse::{MouseMotion, MouseWheel}, prelude::*, window::{CursorGrabMode, PrimaryWindow}};
 use bevy_rapier3d::prelude::*;
 use strum::EnumCount;
 
@@ -201,9 +201,9 @@ fn player_laser(
             warn!("Player has not camera");
             continue;
         };
-        if let Some((_, toi)) = context.cast_ray(camera.translation(), camera.forward(), 5., true, QueryFilter::only_fixed()) {
+        if let Some((_, toi)) = context.cast_ray(camera.translation(), camera.forward().as_vec3(), 5., true, QueryFilter::only_fixed()) {
             let block = BlockId::from_translation(camera.translation() + (camera.forward() * (toi + 0.01)));
-            gizmos.cuboid(Transform::from_translation(block.to_vec3()), Color::BLUE);
+            gizmos.cuboid(Transform::from_translation(block.to_vec3()), BLUE);
             if click.just_pressed(MouseButton::Left) {
                 map.set_block(block, selected.0);
             } else if click.just_pressed(MouseButton::Right) {

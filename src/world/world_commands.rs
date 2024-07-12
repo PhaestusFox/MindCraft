@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_console::{AddConsoleCommand, ConsoleCommand};
+// use bevy_console::{AddConsoleCommand, ConsoleCommand};
 use clap::Parser;
 
 use crate::prelude::ChunkId;

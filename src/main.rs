@@ -1,5 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
-use bevy_editor_pls::prelude::*;
+// use bevy_editor_pls::prelude::*;
 use bevy_rapier3d::prelude::*;
 use blocks::BlockType;
 use prelude::ChunkId;
@@ -29,7 +29,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins((
         DefaultPlugins.build(),
-        EditorPlugin::default(),
+        // EditorPlugin::default(),
         RapierPhysicsPlugin::<()>::default(),
     ));
     #[cfg(debug_assertions)]
@@ -68,8 +68,8 @@ fn main() {
     app.add_plugins(world::WorldPlugin);
     app.configure_sets(Update, Playing.run_if(not(in_state(GameState::MainMenu))));
     app.add_plugins(player_controller::PlayerPlugin);
-    app.add_plugins(bevy_console::ConsolePlugin);
-    app.run()
+    // app.add_plugins(bevy_console::ConsolePlugin);
+    app.run();
 }
 
 fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res<TextureHandles>) {
@@ -168,7 +168,7 @@ fn add_chunk_meshes(
             ));
             });
         }
-        let _ = assets.insert(Handle::weak_from_u128(id.to_u128()), data.main_mesh);
+        let _ = assets.insert(bevy::asset::AssetId::Uuid { uuid: uuid::Uuid::from_u128(id.to_u128()) }, data.main_mesh);
         if let Some(water) = data.water_mesh {
             entity.with_children(|p| {
                 p.spawn((PbrBundle {
