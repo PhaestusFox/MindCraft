@@ -259,7 +259,7 @@ impl Chunk {
                             width[Direction::Up as usize] = 1;
                             length[Direction::Up as usize] += 1;
                             is_solid[index] ^= 1 << Direction::Up as u8;
-                        } else if length[Direction::Up as usize] > 0 {
+                        } else if length[Direction::Up as usize] > 1 {
                             'out: for x in x+1..CHUNK_SIZE {
                                 let mut len = 0;
                                 for i in z..CHUNK_SIZE {
