@@ -252,6 +252,7 @@ impl Chunk {
                 for z in 0..CHUNK_SIZE {
                     let mut length = [0; 6];
                     let mut width = [0; 6];
+                    // Top
                     for i in z..CHUNK_SIZE {
                         let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Up as u8) > 0 {
@@ -282,6 +283,7 @@ impl Chunk {
                             break;
                         }
                     }
+                    // Bottom
                     for i in z..CHUNK_SIZE {
                         let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Down as u8) > 0 {
@@ -292,7 +294,7 @@ impl Chunk {
                             break;
                         }
                     }
-
+                    // Left
                     for i in y..CHUNK_SIZE {
                         let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Left as u8) > 0 {
@@ -303,6 +305,7 @@ impl Chunk {
                             break;
                         }
                     }
+                    // Right
                     for i in y..CHUNK_SIZE {
                         let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Right as u8) > 0 {
@@ -313,8 +316,8 @@ impl Chunk {
                             break;
                         }
                     }
-
-
+                    
+                    // Frount
                     for i in y..CHUNK_SIZE {
                         let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Forward as u8) > 0 {
@@ -325,7 +328,8 @@ impl Chunk {
                             break;
                         }
                     }
-
+                    
+                    // Back
                     for i in y..CHUNK_SIZE {
                         let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
                         if (is_solid[index] & 1 << Direction::Back as u8) > 0 {
