@@ -252,96 +252,43 @@ impl Chunk {
                 for z in 0..CHUNK_SIZE {
                     let mut length = [0; 6];
                     let mut width = [0; 6];
-                    // Top
-                    for i in z..CHUNK_SIZE {
-                        let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Up as u8) > 0 {
-                            width[Direction::Up as usize] = 1;
-                            length[Direction::Up as usize] += 1;
-                            is_solid[index] ^= 1 << Direction::Up as u8;
-                        } else if length[Direction::Up as usize] > 1 {
-                            'out: for x in x+1..CHUNK_SIZE {
-                                let mut len = 0;
-                                for i in z..CHUNK_SIZE {
-                                    let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
-                                    if (is_solid[index] & 1 << Direction::Up as u8) > 0 {
-                                        len += 1;
-                                    } else if len >= length[Direction::Up as usize] {
-                                        width[Direction::Up as usize] += 1;
-                                        for i in z..z+length[Direction::Up as usize] {
-                                            let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
-                                            is_solid[index] ^= 1 << Direction::Up as u8;
+
+                    fn gen_direction(direction: Direction, x: i32, y: i32, z: i32, is_solid: &mut [i32], width: &mut [i32], length: &mut [i32]) {
+                        for i in direction.collider_iter(x, y, z) {
+                            let w = 0;
+                            let index = direction.index(x, y, z, i, w);
+                            if (is_solid[index] & 1 << direction as u8) > 0 {
+                                width[direction as usize] = 1;
+                                length[direction as usize] += 1;
+                                is_solid[index] ^= 1 << direction as u8;
+                            } else if length[direction as usize] > 1 {
+                                'out: for w in direction.width_iter(x, y, z) {
+                                    let mut len = 0;
+                                    for i in z..CHUNK_SIZE {
+                                        let index = direction.index(x, y, z, i, w);
+                                        if (is_solid[index] & 1 << direction as u8) > 0 {
+                                            len += 1;
+                                        } else if len >= length[direction as usize] {
+                                            width[direction as usize] += 1;
+                                            for i in z..z+length[direction as usize] {
+                                                let index = direction.index(x, y, z, i, w);
+                                                is_solid[index] ^= 1 << direction as u8;
+                                            }
+                                            break;
+                                        } else {
+                                            break 'out;
                                         }
-                                        break;
-                                    } else {
-                                        break 'out;
                                     }
                                 }
+                                break;
+                            } else {
+                                break;
                             }
-                            break;
-                        } else {
-                            break;
-                        }
-                    }
-                    // Bottom
-                    for i in z..CHUNK_SIZE {
-                        let index = (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Down as u8) > 0 {
-                            length[Direction::Down as usize] += 1;
-                            width[Direction::Down as usize] = 1;
-                            is_solid[index] ^= 1 << Direction::Down as u8;
-                        } else {
-                            break;
-                        }
-                    }
-                    // Left
-                    for i in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Left as u8) > 0 {
-                            length[Direction::Left as usize] += 1;
-                            width[Direction::Left as usize] = 1;
-                            is_solid[index] ^= 1 << Direction::Left as u8;
-                        } else {
-                            break;
-                        }
-                    }
-                    // Right
-                    for i in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Right as u8) > 0 {
-                            length[Direction::Right as usize] += 1;
-                            width[Direction::Right as usize] = 1;
-                            is_solid[index] ^= 1 << Direction::Right as u8;
-                        } else {
-                            break;
                         }
                     }
                     
-                    // Frount
-                    for i in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Forward as u8) > 0 {
-                            length[Direction::Forward as usize] += 1;
-                            width[Direction::Forward as usize] = 1;
-                            is_solid[index] ^= 1 << Direction::Forward as u8;
-                        } else {
-                            break;
-                        }
-                    }
-                    
-                    // Back
-                    for i in y..CHUNK_SIZE {
-                        let index = (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize;
-                        if (is_solid[index] & 1 << Direction::Back as u8) > 0 {
-                            length[Direction::Back as usize] += 1;
-                            width[Direction::Back as usize] = 1;
-                            is_solid[index] ^= 1 << Direction::Back as u8;
-                        } else {
-                            break;
-                        }
-                    }
-
                     for i in Direction::iter() {
+                        gen_direction(i, x, y, z, &mut is_solid, &mut width, &mut length);
                         if length[i as usize] > 0 {
                             indices.push(IND[1].map(|i| i + vertexs.len() as u32));
                             indices.push(IND[0].map(|i| i + vertexs.len() as u32));
@@ -378,6 +325,50 @@ pub enum Direction {
 }
 
 impl Direction {
+    fn collider_iter(&self, x: i32, y: i32, z: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up |
+            Direction::Down => z..CHUNK_SIZE,
+            _ => y..CHUNK_SIZE
+        }
+    }
+
+    fn index(&self, x: i32, y: i32, z: i32, i: i32, w: i32) -> usize {
+        if w == 0 {
+            match self {
+                Direction::Up |
+                Direction::Down => (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize,
+                _ => (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize
+            }
+        } else {
+            match self {
+                Direction::Up |
+                Direction::Down => (w + i * CHUNK_SIZE + y * CHUNK_AREA) as usize,
+                Direction::Left | 
+                Direction::Right => (x + w * CHUNK_SIZE + i * CHUNK_AREA) as usize,
+                _ => (w + z * CHUNK_SIZE + i * CHUNK_AREA) as usize
+            }
+        }
+    }
+
+    fn len_iter(&self, x: i32, y: i32, z: i32, len: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up |
+            Direction::Down => z..z+len,
+            _ => y..y+len
+        }
+    }
+
+    fn width_iter(&self, x: i32, y: i32, z: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up |
+            Direction::Down => x+1..CHUNK_SIZE,
+            Direction::Left | 
+            Direction::Right => z+1..CHUNK_SIZE,
+            _ => x+1..CHUNK_SIZE
+        }
+    }
+
     fn perp(&self) -> Self {
         match self {
             Direction::Up => Direction::Forward,
