@@ -1,8 +1,14 @@
-use crate::{cam::FlyCam, prelude::*, textures::TextureHandles, GameState, Playing, player_controller::Player};
-use bevy::{prelude::*, utils::{HashMap, HashSet}};
-use bevy_rapier3d::prelude::*;
-use indexmap::IndexMap;
 use self::chunk::Chunk;
+use crate::{
+    cam::FlyCam, player_controller::Player, prelude::*, textures::TextureHandles, GameState,
+    Playing,
+};
+use avian3d::prelude::*;
+use bevy::{
+    prelude::*,
+    utils::{HashMap, HashSet},
+};
+use indexmap::IndexMap;
 
 pub mod chunk;
 
@@ -14,16 +20,13 @@ impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         // world_commands::setup(app);
         app.add_systems(OnEnter(GameState::GenWorld), gen_start_chunks)
-        .add_systems(Update, (gen_view_chunks, hide_view_chunks).in_set(Playing))
-        .insert_resource(WorldDescriptior::new(3))
-        .add_systems(Update, set_to_playing.run_if(in_state(GameState::GenWorld)));
+            .add_systems(Update, (gen_view_chunks, hide_view_chunks).in_set(Playing))
+            .insert_resource(WorldDescriptior::new(3))
+            .add_systems(Update, set_to_playing.run_if(in_state(GameState::GenWorld)));
     }
 }
 
-fn set_to_playing(
-    mut next: ResMut<NextState<GameState>>,
-    map: Res<Map>,
-) {
+fn set_to_playing(mut next: ResMut<NextState<GameState>>, map: Res<Map>) {
     if map.to_gen_len() == 0 {
         next.set(GameState::Playing);
     }
@@ -52,7 +55,10 @@ impl WorldDescriptior {
 }
 
 #[derive(Resource, Clone)]
-pub struct Map(std::sync::Arc<std::sync::RwLock<MapInternal>>, std::sync::Arc<std::thread::JoinHandle<()>>);
+pub struct Map(
+    std::sync::Arc<std::sync::RwLock<MapInternal>>,
+    std::sync::Arc<std::thread::JoinHandle<()>>,
+);
 
 struct MapInternal {
     descriptior: WorldDescriptior,
@@ -73,12 +79,19 @@ impl MapInternal {
 
     pub fn clear_chunk(&mut self, chunk_id: ChunkId) {
         let Some(chunk) = self.get_chunk_mut(&chunk_id) else {
-            self.chunks.insert(chunk_id, Chunk { id: chunk_id, entity: None, blocks: [BlockType::Air; CHUNK_VOL as usize] });
+            self.chunks.insert(
+                chunk_id,
+                Chunk {
+                    id: chunk_id,
+                    entity: None,
+                    blocks: [BlockType::Air; CHUNK_VOLUME as usize],
+                },
+            );
             return;
         };
-        chunk.blocks = [BlockType::Air; CHUNK_VOL as usize];
+        chunk.blocks = [BlockType::Air; CHUNK_VOLUME as usize];
         self.can_mesh.insert(chunk_id);
-        for n in chunk_id.neighbours() {
+        for n in chunk_id.neighbors() {
             self.can_mesh.insert(n);
         }
     }
@@ -104,7 +117,8 @@ impl MapInternal {
         if block.z() == 0 {
             self.can_mesh.insert(chunk_id.get(chunk::Direction::Back));
         } else if block.z() == CHUNK_SIZE - 1 {
-            self.can_mesh.insert(chunk_id.get(chunk::Direction::Forward));
+            self.can_mesh
+                .insert(chunk_id.get(chunk::Direction::Forward));
         }
     }
 
@@ -121,15 +135,23 @@ impl MapInternal {
     }
 
     pub fn regen_chunk(&mut self, id: ChunkId) {
-        let Some(old) = self.chunks.get(&id) else {return;};
+        let Some(old) = self.chunks.get(&id) else {
+            return;
+        };
         let mut chunk = chunk::Chunk::new(id, &self.descriptior.rng, self.descriptior.seed);
         chunk.entity = old.entity;
         self.chunks.insert(id, chunk);
     }
 
     fn gen_chunk(&self, id: ChunkId) -> Option<Chunk> {
-        if self.chunks.contains_key(&id) {return None;}
-        Some(chunk::Chunk::new(id, &self.descriptior.rng, self.descriptior.seed))
+        if self.chunks.contains_key(&id) {
+            return None;
+        }
+        Some(chunk::Chunk::new(
+            id,
+            &self.descriptior.rng,
+            self.descriptior.seed,
+        ))
     }
 
     fn get_or_gen_chunk_mut(&mut self, id: ChunkId) -> &mut Chunk {
@@ -141,8 +163,10 @@ impl MapInternal {
     }
 
     pub fn gen_or_update_chunk(&mut self, id: ChunkId, entity: Entity) {
-        for n in id.neighbours() {
-            if n.y() > 4 || n.y() < 0 {continue;}
+        for n in id.neighbors() {
+            if n.y() > 4 || n.y() < 0 {
+                continue;
+            }
             self.add_to_gen(n, None);
         }
 
@@ -171,7 +195,12 @@ impl MapInternal {
     }
 
     pub fn new_with_seed(seed: u64) -> MapInternal {
-        MapInternal { descriptior: WorldDescriptior::new(seed), chunks: default(), can_mesh: default(), to_gen: default() }
+        MapInternal {
+            descriptior: WorldDescriptior::new(seed),
+            chunks: default(),
+            can_mesh: default(),
+            to_gen: default(),
+        }
     }
 
     pub fn to_gen(&self) -> usize {
@@ -193,7 +222,9 @@ impl Map {
     pub fn get_max_hight(&self, block: BlockId) -> i32 {
         let map = self.0.read().unwrap();
         let mut block = BlockId::new(block.x(), 0, block.z());
-        while map.get_block(block) != BlockType::Air && map.get_block(block.get(chunk::Direction::Up)) != BlockType::Air {
+        while map.get_block(block) != BlockType::Air
+            && map.get_block(block.get(chunk::Direction::Up)) != BlockType::Air
+        {
             block = block.get(chunk::Direction::Up);
         }
         block.y()
@@ -214,7 +245,7 @@ impl Map {
     pub fn take_new(&self) -> Vec<ChunkId> {
         self.0.write().unwrap().take_new()
     }
-    
+
     pub fn gen_or_update_chunk(&self, id: ChunkId, entity: Entity) {
         self.0.write().unwrap().gen_or_update_chunk(id, entity)
     }
@@ -228,15 +259,18 @@ impl Map {
         let internal = MapInternal::new_with_seed(seed);
         let internal = std::sync::Arc::new(std::sync::RwLock::new(internal));
         let rec_local = internal.clone();
-        let join = std::thread::spawn(move || {
-            loop {
+        let join = std::thread::spawn(move || loop {
             let mut made = Vec::with_capacity(10);
             let Ok(mut rec) = rec_local.try_write() else {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 continue;
             };
             for _ in 0..10 {
-                let (id, entity) = if let Some((id, entity)) = rec.to_gen.iter().next() {(*id, *entity)} else {break;};
+                let (id, entity) = if let Some((id, entity)) = rec.to_gen.iter().next() {
+                    (*id, *entity)
+                } else {
+                    break;
+                };
                 let chunk = rec.get_or_gen_chunk_mut(id);
                 if let Some(entity) = entity {
                     chunk.set_entity(entity);
@@ -246,7 +280,6 @@ impl Map {
             }
             for made in made {
                 rec.to_gen.remove(&made);
-            }
             }
         });
         Map(internal, std::sync::Arc::new(join))
@@ -272,20 +305,22 @@ pub fn gen_start_chunks(
         for z in -5..5 {
             for x in -5..5 {
                 let id = ChunkId::new(x, y, z);
-                let entity = commands.spawn((
-                    PbrBundle {
-                        transform: Transform::from_translation(Vec3::new(
-                            (x * CHUNK_SIZE) as f32,
-                            (y * CHUNK_SIZE) as f32,
-                            (z * CHUNK_SIZE) as f32,
-                        )),
-                        material: matt.get_atlas(),
-                        mesh: Handle::weak_from_u128(id.to_u128()),
-                        ..Default::default()
-                    },
-                    id,
-                    RigidBody::Fixed,
-                )).id();
+                let entity = commands
+                    .spawn((
+                        PbrBundle {
+                            transform: Transform::from_translation(Vec3::new(
+                                (x * CHUNK_SIZE) as f32,
+                                (y * CHUNK_SIZE) as f32,
+                                (z * CHUNK_SIZE) as f32,
+                            )),
+                            material: MeshMaterial3d(matt.get_atlas()),
+                            mesh: Mesh3d(Handle::weak_from_u128(id.to_u128())),
+                            ..Default::default()
+                        },
+                        id,
+                        RigidBody::Static,
+                    ))
+                    .id();
                 map.gen_or_update_chunk(id, entity);
             }
         }
@@ -317,23 +352,26 @@ pub fn gen_view_chunks(
                 continue;
             }
             num_this_frame += 1;
-            if num_this_frame > MAX_PER_FRAME {return;}
+            if num_this_frame > MAX_PER_FRAME {
+                return;
+            }
             for y in 0..5 {
                 let pos = ChunkId::new(center.x() + x, y, center.z() + z);
-                let entity = commands.spawn((
-                    PbrBundle {
-                        transform: Transform::from_translation(Vec3::new(
-                            (pos.x() * CHUNK_SIZE) as f32,
-                            (pos.y() * CHUNK_SIZE) as f32,
-                            (pos.z() * CHUNK_SIZE) as f32,
-                        )),
-                        material: matt.get_atlas(),
-                        mesh: Handle::weak_from_u128(pos.to_u128()),
-                        ..Default::default()
-                    },
-                    pos,
-                    RigidBody::Fixed,
-                )).id();
+                let entity = commands
+                    .spawn((
+                        PbrBundle {
+                            transform: Transform::from_translation(Vec3::new(
+                                (pos.x() * CHUNK_SIZE) as f32,
+                                (pos.y() * CHUNK_SIZE) as f32,
+                                (pos.z() * CHUNK_SIZE) as f32,
+                            )),
+                            material: MeshMaterial3d(matt.get_atlas()),
+                            mesh: Mesh3d(Handle::weak_from_u128(pos.to_u128())),
+                            ..Default::default()
+                        },
+                        pos,
+                    ))
+                    .id();
                 map.gen_or_update_chunk(pos, entity);
             }
         }
@@ -342,24 +380,30 @@ pub fn gen_view_chunks(
 
 pub fn hide_view_chunks(
     mut commands: Commands,
-    mut chunks: Query<(Entity, &ChunkId, &mut Visibility)>,
+    mut chunks: Query<(Entity, &ChunkId, &mut Visibility, Option<&RigidBody>)>,
     player: Query<&Transform, With<Player>>,
     view_distance: Res<crate::settings::ViewDistance>,
     map: Res<Map>,
     mut gen_tasks: ResMut<crate::ChunkMeshTasks>,
 ) {
     let player = ChunkId::from(player.single().translation);
-    for (e, id, mut vis) in &mut chunks {
+    for (e, id, mut vis, body) in &mut chunks {
         let dis = id.flat_distance(player);
-        if dis > view_distance.0 * 2 + 5 {
+        if dis > view_distance.0 + 2 {
             gen_tasks.cancel(id);
             map.remove_chunk(id);
             commands.entity(e).despawn_recursive();
             continue;
         }
-        *vis = if dis > 2 * view_distance.0 {
+        *vis = if dis > view_distance.0 {
+            if body.is_some() {
+                commands.entity(e).remove::<RigidBody>();
+            }
             Visibility::Hidden
         } else {
+            if body.is_none() {
+                commands.entity(e).insert(RigidBody::Static);
+            }
             Visibility::Inherited
         };
     }

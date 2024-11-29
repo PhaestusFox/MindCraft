@@ -1,7 +1,23 @@
-use crate::prelude::Direction;
-use bevy::{prelude::*, render::{mesh::VertexAttributeValues, render_asset::RenderAssetUsages}, utils::HashMap};
+use crate::prelude::*;
+use bevy::{
+    prelude::*,
+    render::{mesh::VertexAttributeValues, render_asset::RenderAssetUsages},
+    utils::HashMap,
+};
+use std::ops::Add;
 
-#[derive(Debug, Default, Clone, Copy, strum_macros::EnumIter, strum_macros::EnumCount, PartialEq, Eq, Hash, strum_macros::FromRepr)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    strum_macros::EnumIter,
+    strum_macros::EnumCount,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::FromRepr,
+)]
 pub enum BlockType {
     #[default]
     Air,
@@ -18,6 +34,138 @@ pub enum BlockType {
     Water,
 }
 
+#[derive(Debug, strum_macros::EnumIter, Clone, Copy, PartialEq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+    Forward,
+    Back,
+}
+
+impl Direction {
+    fn collider_iter(&self, x: i32, y: i32, z: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up | Direction::Down => z..CHUNK_SIZE,
+            _ => y..CHUNK_SIZE,
+        }
+    }
+
+    fn index(&self, x: i32, y: i32, z: i32, i: i32, w: i32) -> usize {
+        if w == 0 {
+            match self {
+                Direction::Up | Direction::Down => (x + i * CHUNK_SIZE + y * CHUNK_AREA) as usize,
+                _ => (x + z * CHUNK_SIZE + i * CHUNK_AREA) as usize,
+            }
+        } else {
+            match self {
+                Direction::Up | Direction::Down => (w + i * CHUNK_SIZE + y * CHUNK_AREA) as usize,
+                Direction::Left | Direction::Right => {
+                    (x + w * CHUNK_SIZE + i * CHUNK_AREA) as usize
+                }
+                _ => (w + z * CHUNK_SIZE + i * CHUNK_AREA) as usize,
+            }
+        }
+    }
+
+    fn len_iter(&self, x: i32, y: i32, z: i32, len: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up | Direction::Down => z..z + len,
+            _ => y..y + len,
+        }
+    }
+
+    fn width_iter(&self, x: i32, y: i32, z: i32) -> core::ops::Range<i32> {
+        match self {
+            Direction::Up | Direction::Down => x + 1..CHUNK_SIZE,
+            Direction::Left | Direction::Right => z + 1..CHUNK_SIZE,
+            _ => x + 1..CHUNK_SIZE,
+        }
+    }
+
+    fn perp(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Forward,
+            Direction::Down => Direction::Back,
+            Direction::Left => Direction::Up,
+            Direction::Right => Direction::Down,
+            Direction::Forward => Direction::Right,
+            Direction::Back => Direction::Left,
+        }
+    }
+
+    fn rev(&self) -> Self {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::Forward => Direction::Back,
+            Direction::Back => Direction::Forward,
+        }
+    }
+
+    fn collider_verts(&self, len: i32, width: i32) -> [Vec3; 4] {
+        assert!(len > 0);
+        assert!(width > 0);
+        match self {
+            Direction::Up => [
+                Vec3::new(-0.5, 0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, 0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, 0.5, len as f32 - 0.5),
+                Vec3::new(-0.5, 0.5, len as f32 - 0.5),
+            ],
+            Direction::Down => [
+                Vec3::new(-0.5, -0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, -0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, -0.5, len as f32 - 0.5),
+                Vec3::new(-0.5, -0.5, len as f32 - 0.5),
+            ],
+            Direction::Left => [
+                Vec3::new(-0.5, -0.5, -0.5),
+                Vec3::new(-0.5, len as f32 - 0.5, -0.5),
+                Vec3::new(-0.5, len as f32 - 0.5, width as f32 - 0.5),
+                Vec3::new(-0.5, -0.5, width as f32 - 0.5),
+            ],
+            Direction::Right => [
+                Vec3::new(0.5, -0.5, -0.5),
+                Vec3::new(0.5, len as f32 - 0.5, -0.5),
+                Vec3::new(0.5, len as f32 - 0.5, width as f32 - 0.5),
+                Vec3::new(0.5, -0.5, width as f32 - 0.5),
+            ],
+            Direction::Forward => [
+                Vec3::new(-0.5, -0.5, -0.5),
+                Vec3::new(-0.5, len as f32 - 0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, len as f32 - 0.5, -0.5),
+                Vec3::new(width as f32 - 0.5, -0.5, -0.5),
+            ],
+            Direction::Back => [
+                Vec3::new(-0.5, -0.5, 0.5),
+                Vec3::new(-0.5, len as f32 - 0.5, 0.5),
+                Vec3::new(width as f32 - 0.5, len as f32 - 0.5, 0.5),
+                Vec3::new(width as f32 - 0.5, -0.5, 0.5),
+            ],
+        }
+    }
+}
+
+impl Add<Direction> for IVec3 {
+    type Output = IVec3;
+
+    fn add(mut self, rhs: Direction) -> Self::Output {
+        match rhs {
+            Direction::Up => self.y += 1,
+            Direction::Down => self.y -= 1,
+            Direction::Left => self.x -= 1,
+            Direction::Right => self.x += 1,
+            Direction::Forward => self.z += 1,
+            Direction::Back => self.z -= 1,
+        }
+        self
+    }
+}
+
 pub struct MeshData {
     pub pos: &'static [[f32; 3]],
     pub uv: Vec<[f32; 2]>,
@@ -28,17 +176,15 @@ pub struct MeshData {
 impl BlockType {
     pub const fn is_transparent(&self) -> bool {
         match self {
-            BlockType::Water |
-            BlockType::Air => true,
-            _ => false
+            BlockType::Water | BlockType::Air => true,
+            _ => false,
         }
     }
 
     pub const fn is_solid(&self) -> bool {
         match self {
-            BlockType::Water |
-            BlockType::Air => false,
-            _ => true
+            BlockType::Water | BlockType::Air => false,
+            _ => true,
         }
     }
 
@@ -62,7 +208,7 @@ impl BlockType {
             BlockType::Water => &[],
         }
     }
-    
+
     pub const fn get_icon_paths(&self) -> &'static str {
         match self {
             BlockType::Air => "",
@@ -82,7 +228,7 @@ impl BlockType {
 
     pub fn gen_mesh(
         &self,
-        direction: crate::world::chunk::Direction,
+        direction: Direction,
         atlas_map: &crate::prelude::TextureHandles,
     ) -> MeshData {
         match self {
@@ -108,15 +254,26 @@ impl BlockType {
         }
     }
 
-    pub fn water_mesh(direction: Direction, atlas_map: &crate::prelude::TextureHandles, top_air: bool, facing_solid: bool) -> MeshData {
+    pub fn water_mesh(
+        direction: Direction,
+        atlas_map: &crate::prelude::TextureHandles,
+        top_air: bool,
+        facing_solid: bool,
+    ) -> MeshData {
         let indexes = atlas_map.get_indexes(&BlockType::Water);
         MeshData {
-            pos: if top_air { BlockType::water_face(direction) } else {
+            pos: if top_air {
+                BlockType::water_face(direction)
+            } else {
                 BlockType::block_face(direction)
             },
             uv: BlockType::block_uv(indexes[0], atlas_map.len()),
             color: &[[0.2, 0.2, 0.8, 0.25]; 4],
-            indices: if facing_solid { &[2, 1, 0, 0, 3, 2] } else {&[0, 1, 2, 2, 3, 0, 2, 1, 0, 0, 3, 2]},
+            indices: if facing_solid {
+                &[2, 1, 0, 0, 3, 2]
+            } else {
+                &[0, 1, 2, 2, 3, 0, 2, 1, 0, 0, 3, 2]
+            },
         }
     }
 
@@ -129,29 +286,29 @@ impl BlockType {
                 // Front face
                 [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 0
                 [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 1
-                [HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],         // 2
-                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],     // 3
+                [HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],   // 2
+                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH], // 3
             ],
             Direction::Back => &[
                 // Back face
                 [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
                 [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
                 [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH], // 7
-                [HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH],     // 4
+                [HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH], // 4
             ],
             Direction::Left => &[
                 // Left face
                 [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
                 [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 9
-                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],         // 10
-                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH],     // 11
+                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],   // 10
+                [NEG_HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH], // 11
             ],
             Direction::Right => &[
                 // Right face
                 [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 13
                 [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 14
                 [HALF_LENGTH, HALF_LENGTH - 0.1, NEG_HALF_LENGTH], // 15
-                [HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH],     // 12
+                [HALF_LENGTH, HALF_LENGTH - 0.1, HALF_LENGTH], // 12
             ],
             Direction::Up => &[
                 // Top face
@@ -269,57 +426,57 @@ impl BlockType {
         }
     }
 
-        pub fn block_face_with_len(direction: Direction, len: f32) -> [[f32; 3]; 4] {
-            const SIZE_LENGTH: f32 = 1.0;
-            const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
-            const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
-            match direction {
-                Direction::Forward => [
-                    // Front face
-                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 0
-                    [len + HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 1
-                    [len + HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],         // 2
-                    [NEG_HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 3
-                ],
-                Direction::Back => [
-                    // Back face
-                    [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
-                    [NEG_HALF_LENGTH - len, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
-                    [NEG_HALF_LENGTH - len, HALF_LENGTH, NEG_HALF_LENGTH], // 7
-                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],     // 4
-                ],
-                Direction::Left => [
-                    // Left face
-                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
-                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 9
-                    [NEG_HALF_LENGTH, HALF_LENGTH + len, HALF_LENGTH],         // 10
-                    [NEG_HALF_LENGTH, HALF_LENGTH + len, NEG_HALF_LENGTH],     // 11
-                ],
-                Direction::Right => [
-                    // Right face
-                    // . .
-                    // . .
-                    [HALF_LENGTH, NEG_HALF_LENGTH - len, HALF_LENGTH], // 13
-                    [HALF_LENGTH, NEG_HALF_LENGTH - len, NEG_HALF_LENGTH], // 14
-                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 15
-                    [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 12
-                ],
-                Direction::Up => [
-                    // Top face
-                    [HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 16
-                    [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 17
-                    [NEG_HALF_LENGTH, HALF_LENGTH,NEG_HALF_LENGTH], // 18
-                    [NEG_HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 19
-                ],
-                Direction::Down => [
-                    // Bottom face
-                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len], // 20
-                    [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len],     // 21
-                    [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],         // 22
-                    [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 23
-                ],
-            }
+    pub fn block_face_with_len(direction: Direction, len: f32) -> [[f32; 3]; 4] {
+        const SIZE_LENGTH: f32 = 1.0;
+        const HALF_LENGTH: f32 = SIZE_LENGTH / 2.0;
+        const NEG_HALF_LENGTH: f32 = -HALF_LENGTH;
+        match direction {
+            Direction::Forward => [
+                // Front face
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 0
+                [len + HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH], // 1
+                [len + HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],   // 2
+                [NEG_HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],     // 3
+            ],
+            Direction::Back => [
+                // Back face
+                [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 5
+                [NEG_HALF_LENGTH - len, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 6
+                [NEG_HALF_LENGTH - len, HALF_LENGTH, NEG_HALF_LENGTH], // 7
+                [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],     // 4
+            ],
+            Direction::Left => [
+                // Left face
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH], // 8
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],     // 9
+                [NEG_HALF_LENGTH, HALF_LENGTH + len, HALF_LENGTH],   // 10
+                [NEG_HALF_LENGTH, HALF_LENGTH + len, NEG_HALF_LENGTH], // 11
+            ],
+            Direction::Right => [
+                // Right face
+                // . .
+                // . .
+                [HALF_LENGTH, NEG_HALF_LENGTH - len, HALF_LENGTH], // 13
+                [HALF_LENGTH, NEG_HALF_LENGTH - len, NEG_HALF_LENGTH], // 14
+                [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],       // 15
+                [HALF_LENGTH, HALF_LENGTH, HALF_LENGTH],           // 12
+            ],
+            Direction::Up => [
+                // Top face
+                [HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 16
+                [HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH],   // 17
+                [NEG_HALF_LENGTH, HALF_LENGTH, NEG_HALF_LENGTH], // 18
+                [NEG_HALF_LENGTH, HALF_LENGTH, len + HALF_LENGTH], // 19
+            ],
+            Direction::Down => [
+                // Bottom face
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len], // 20
+                [HALF_LENGTH, NEG_HALF_LENGTH, NEG_HALF_LENGTH - len],     // 21
+                [HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],               // 22
+                [NEG_HALF_LENGTH, NEG_HALF_LENGTH, HALF_LENGTH],           // 23
+            ],
         }
+    }
 }
 
 pub fn make_test_block_mesh(block_index: usize, atlas_size: usize) -> Mesh {
@@ -340,7 +497,10 @@ pub fn make_test_block_mesh(block_index: usize, atlas_size: usize) -> Mesh {
             [uv_x_0, uv_y_0],
         ]);
     }
-    let mut mesh = Mesh::new(bevy::render::render_resource::PrimitiveTopology::TriangleList, RenderAssetUsages::all());
+    let mut mesh = Mesh::new(
+        bevy::render::render_resource::PrimitiveTopology::TriangleList,
+        RenderAssetUsages::all(),
+    );
     mesh.insert_attribute(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(get_test_vertexes()),

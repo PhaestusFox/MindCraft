@@ -6,8 +6,8 @@ use bevy::prelude::*;
 use crate::prelude::Direction;
 use crate::prelude::*;
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChunkId(IVec3);
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Deref, DerefMut)]
+pub struct ChunkId(pub IVec3);
 
 impl From<Vec3> for ChunkId {
     fn from(value: Vec3) -> Self {
@@ -45,6 +45,14 @@ impl ChunkId {
         self.0.z
     }
 
+    pub const fn to_translation(&self) -> Vec3 {
+        Vec3 {
+            x: (self.0.x * CHUNK_SIZE + CHUNK_SIZE / 2) as f32 - 0.5,
+            y: (self.0.y * CHUNK_SIZE + CHUNK_SIZE / 2) as f32 - 0.5,
+            z: (self.0.z * CHUNK_SIZE + CHUNK_SIZE / 2) as f32 - 0.5,
+        }
+    }
+
     pub const fn get(&self, direction: Direction) -> ChunkId {
         match direction {
             Direction::Up => ChunkId::new(self.x(), self.y() + 1, self.z()),
@@ -73,14 +81,14 @@ impl ChunkId {
         x_dif.abs() + z_dif.abs()
     }
 
-    pub const fn neighbours(&self) -> [ChunkId; 6] {
+    pub const fn neighbors(&self) -> [ChunkId; 6] {
         [
-           self.get(Direction::Up), 
-           self.get(Direction::Down), 
-           self.get(Direction::Left), 
-           self.get(Direction::Right), 
-           self.get(Direction::Forward), 
-           self.get(Direction::Back), 
+            self.get(Direction::Up),
+            self.get(Direction::Down),
+            self.get(Direction::Left),
+            self.get(Direction::Right),
+            self.get(Direction::Forward),
+            self.get(Direction::Back),
         ]
     }
 }
@@ -134,7 +142,7 @@ impl PartialOrd<i32> for ChunkId {
     }
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, Deref)]
 pub struct BlockId(IVec3);
 
 impl BlockId {
@@ -152,6 +160,10 @@ impl BlockId {
 
     pub fn z(&self) -> i32 {
         self.0.z
+    }
+
+    pub fn as_local(&self) -> BlockId {
+        BlockId(self.rem_euclid(IVec3::splat(CHUNK_SIZE)))
     }
 
     pub fn from_translation(translation: Vec3) -> BlockId {
@@ -179,7 +191,7 @@ impl From<BlockId> for ChunkId {
         let x = (value.0.x + (value.0.x < 0) as i32) / CHUNK_SIZE - (value.0.x < 0) as i32;
         let y = (value.0.y + (value.0.y < 0) as i32) / CHUNK_SIZE - (value.0.y < 0) as i32;
         let z = (value.0.z + (value.0.z < 0) as i32) / CHUNK_SIZE - (value.0.z < 0) as i32;
-        ChunkId(IVec3::new(x,y,z))
+        ChunkId(IVec3::new(x, y, z))
     }
 }
 
@@ -229,9 +241,18 @@ fn test_block_to_chunk() {
                 for bx in 0..CHUNK_SIZE {
                     for by in 0..CHUNK_SIZE {
                         for bz in 0..CHUNK_SIZE {
-                            let block_id = BlockId::new(bx + x * CHUNK_SIZE, by + y * CHUNK_SIZE, bz + z * CHUNK_SIZE);
+                            let block_id = BlockId::new(
+                                bx + x * CHUNK_SIZE,
+                                by + y * CHUNK_SIZE,
+                                bz + z * CHUNK_SIZE,
+                            );
                             if ChunkId::from(block_id) != chunk_id {
-                                panic!("{:?} | {:?} != {:?}", ChunkId::from(block_id), block_id, chunk_id);
+                                panic!(
+                                    "{:?} | {:?} != {:?}",
+                                    ChunkId::from(block_id),
+                                    block_id,
+                                    chunk_id
+                                );
                             }
                         }
                     }

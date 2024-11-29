@@ -1,21 +1,46 @@
-use bevy::{color::palettes::css::BLUE, ecs::event::ManualEventReader, input::mouse::{MouseMotion, MouseWheel}, prelude::*, window::{CursorGrabMode, PrimaryWindow}};
-use bevy_rapier3d::prelude::*;
+use avian3d::prelude::*;
+use bevy::{
+    color::palettes::css::BLUE,
+    input::mouse::{MouseMotion, MouseWheel},
+    prelude::*,
+    window::{CursorGrabMode, PrimaryWindow},
+};
 use strum::EnumCount;
 
-use crate::{prelude::{GROUND_HEIGHT, BlockId, BlockType}, GameState, cam::{MovementSettings, KeyBindings}, Playing, world::Map};
+use crate::{
+    cam::{KeyBindings, MovementSettings},
+    prelude::{BlockId, BlockType, ChunkId, CHUNK_SIZE, GROUND_HEIGHT},
+    terrain::Map,
+    GameState, Playing,
+};
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
-        .add_systems(Update, (noclip, player_look, player_laser, set_selected).in_set(Playing))
-        .add_systems(Update, player_move.in_set(Playing).run_if(in_state(PlayerMode::Normal)))
-        .add_systems(Update, noclip_move.in_set(Playing).run_if(in_state(PlayerMode::NoClip)))
-        .add_systems(OnExit(GameState::GenWorld), set_play_ground)
-        .init_resource::<InputState>()
-        .init_resource::<SelectedBlock>()
-        .init_state::<PlayerMode>();
+            .add_systems(
+                Update,
+                (noclip, player_look, player_laser, set_selected).in_set(Playing),
+            )
+            .add_systems(
+                Update,
+                (render_gravity, player_move)
+                    .chain()
+                    .in_set(Playing)
+                    .run_if(in_state(PlayerMode::Normal)),
+            )
+            .add_systems(
+                Update,
+                noclip_move
+                    .in_set(Playing)
+                    .run_if(in_state(PlayerMode::NoClip)),
+            )
+            .init_resource::<SelectedBlock>()
+            .init_state::<PlayerMode>()
+            .add_systems(Update, gravity);
+        #[cfg(debug_assertions)]
+        app.add_systems(Update, (render_player_collider));
     }
 }
 
@@ -30,35 +55,23 @@ fn noclip(
     mut players: Query<&mut RigidBody, With<Player>>,
     input: Res<ButtonInput<KeyCode>>,
     state: Res<State<PlayerMode>>,
-    mut next: ResMut<NextState<PlayerMode>>
+    mut next: ResMut<NextState<PlayerMode>>,
 ) {
     if input.just_pressed(KeyCode::F12) {
         match state.get() {
             PlayerMode::Normal => {
                 for mut p in &mut players {
-                    *p = RigidBody::KinematicPositionBased;
+                    *p = RigidBody::Kinematic;
                 }
                 next.set(PlayerMode::NoClip);
-            },
+            }
             PlayerMode::NoClip => {
                 for mut p in &mut players {
                     *p = RigidBody::Dynamic;
                 }
                 next.set(PlayerMode::Normal);
-            },
+            }
         }
-    }
-}
-
-
-fn set_play_ground(
-    mut players: Query<&mut Transform, With<Player>>,
-    map: Res<Map>,
-) {
-    for mut player in &mut players {
-        let pos = BlockId::from_translation(player.translation);
-        player.translation = pos.to_vec3();
-        player.translation.y = (map.get_max_hight(pos) + 100) as f32;
     }
 }
 
@@ -87,73 +100,74 @@ impl std::fmt::Display for SelectedBlock {
     }
 }
 
-pub fn spawn_player(
-    mut commands: Commands,
-) {
-    let cam = commands.spawn(Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 1.75, 0.)),
-        ..Default::default()
-    }).id();
-
-    commands.spawn((
-        RigidBody::Dynamic,
-        Player,
-        ExternalImpulse::default(),
-        LockedAxes::ROTATION_LOCKED,
-        SpatialBundle{
-            transform: Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
+pub fn spawn_player(mut commands: Commands) {
+    let cam = commands
+        .spawn(Camera3dBundle {
+            transform: Transform::from_translation(Vec3::new(0., 1.75, 0.)),
             ..Default::default()
-        },
-        Damping{linear_damping: 0.5, angular_damping: 1.},
-        PlayerCamera(cam),
-    )).with_children(|p| {
-        p.spawn((
-            Collider::capsule(Vec3::ZERO, Vec3::Y * 1.90, 0.4),
-            Ccd{enabled: true},
-            SpatialBundle{
-            transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-            ..Default::default()
-        }));
-    }).add_child(cam);
-}
+        })
+        .id();
 
-/// Keeps track of mouse motion events, pitch, and yaw
-#[derive(Resource, Default)]
-struct InputState {
-    reader_motion: ManualEventReader<MouseMotion>,
+    commands
+        .spawn((
+            RigidBody::Static,
+            Player,
+            ExternalImpulse::default(),
+            LockedAxes::ROTATION_LOCKED,
+            SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
+                ..Default::default()
+            },
+            AngularDamping(1.),
+            LinearDamping(0.5),
+            PlayerCamera(cam),
+        ))
+        .with_children(|p| {
+            p.spawn((
+                Collider::capsule(0.4, 1.),
+                SpatialBundle {
+                    transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+                    ..Default::default()
+                },
+            ));
+        })
+        .add_child(cam);
 }
 
 /// Handles looking around if cursor is locked
 fn player_look(
     settings: Res<MovementSettings>,
     primary_window: Query<&Window, With<PrimaryWindow>>,
-    mut state: ResMut<InputState>,
-    motion: Res<Events<MouseMotion>>,
+    mut state: EventReader<MouseMotion>,
     mut query: Query<(&mut Transform, &PlayerCamera), With<Player>>,
-    mut cams: Query<&mut Transform, (Without<Player>, With<Camera>)>
+    mut cams: Query<&mut Transform, (Without<Player>, With<Camera>)>,
+    gravity: Res<Gravity>,
 ) {
     if let Ok(window) = primary_window.get_single() {
         for (mut transform, player_camera) in query.iter_mut() {
-            let Ok(mut camera_transform) = cams.get_mut(player_camera.0) else {error!("Player has no camera;"); continue;};
+            let Ok(mut camera_transform) = cams.get_mut(player_camera.0) else {
+                error!("Player has no camera;");
+                continue;
+            };
             let (_, mut pitch, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
-            for ev in state.reader_motion.read(&motion) {
-                let (mut yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
-                match window.cursor.grab_mode {
-                    CursorGrabMode::None => (),
-                    _ => {
-                        // Using smallest of height or width ensures equal vertical and horizontal sensitivity
-                        let window_scale = window.height().min(window.width());
-                        pitch -= (settings.sensitivity * ev.delta.y * window_scale).to_radians();
-                        yaw -= (settings.sensitivity * ev.delta.x * window_scale).to_radians();
-                    }
-                }
-
-                pitch = pitch.clamp(-1.54, 1.54);
-
-                // Order is important to prevent unintended roll
-                transform.rotation =
-                    Quat::from_axis_angle(Vec3::Y, yaw);
+            let delta: Vec2 = state.read().map(|d| d.delta).sum();
+            if delta.length() < 0.1 {
+                return;
             }
+            let (mut yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
+            match window.cursor_options.grab_mode {
+                CursorGrabMode::None => (),
+                _ => {
+                    // Using smallest of height or width ensures equal vertical and horizontal sensitivity
+                    let window_scale = window.height().min(window.width());
+                    pitch -= (settings.sensitivity * delta.y * window_scale).to_radians();
+                    yaw -= (settings.sensitivity * delta.x * window_scale).to_radians();
+                }
+            }
+            pitch = pitch.clamp(-1.57, 1.57);
+
+            // Order is important to prevent unintended roll
+            transform.rotation = Quat::from_axis_angle(Vec3::Y, yaw);
             camera_transform.rotation = Quat::from_axis_angle(Vec3::X, pitch);
         }
     } else {
@@ -168,17 +182,18 @@ fn player_move(
     primary_window: Query<&Window, With<PrimaryWindow>>,
     settings: Res<MovementSettings>,
     key_bindings: Res<KeyBindings>,
-    mut query: Query<(&mut ExternalImpulse, &Transform), With<Player>>,
+    mut query: Query<(&mut ExternalImpulse, &mut Transform), With<Player>>,
+    map: Res<Map>,
 ) {
     if let Ok(window) = primary_window.get_single() {
-        for (mut impulse, transform) in query.iter_mut() {
+        for (mut impulse, mut transform) in query.iter_mut() {
             let mut velocity = Vec3::ZERO;
             let local_z = transform.local_z();
             let forward = -Vec3::new(local_z.x, 0., local_z.z);
             let right = Vec3::new(local_z.z, 0., -local_z.x);
 
             for key in keys.get_pressed() {
-                match window.cursor.grab_mode {
+                match window.cursor_options.grab_mode {
                     CursorGrabMode::None => (),
                     _ => {
                         let key = *key;
@@ -187,7 +202,7 @@ fn player_move(
                         } else if key == key_bindings.move_backward {
                             velocity -= forward;
                         } else if key == key_bindings.move_left {
-                            velocity -= right; 
+                            velocity -= right;
                         } else if key == key_bindings.move_right {
                             velocity += right;
                         } else if key == key_bindings.move_ascend {
@@ -197,9 +212,35 @@ fn player_move(
                         }
                     }
                 }
-
-                impulse.impulse = velocity * time.delta_seconds() * settings.speed
             }
+
+            let next = transform.translation + velocity * time.delta_secs() * settings.speed;
+            if !map.get_block(BlockId::from_translation(next)).is_solid() {
+                transform.translation = next;
+            } else {
+                let end = transform.translation + velocity * settings.speed * time.delta_secs();
+                let hit = BlockId::from_translation(next).as_vec3();
+                let current = BlockId::from_translation(transform.translation).as_vec3();
+                let mut trans = Transform::from_translation(end);
+                let mut start = end;
+                let dif = hit - current;
+                if dif.x != 0. {
+                    start.x = transform.translation.x;
+                    let fin = start + (start - transform.translation);
+                    if !map.get_block(BlockId::from_translation(fin)).is_solid() {
+                        transform.translation = fin;
+                    }
+                }
+
+                if dif.z != 0. {
+                    start.z = transform.translation.z;
+                    let fin = start + (start - transform.translation);
+                    if !map.get_block(BlockId::from_translation(fin)).is_solid() {
+                        transform.translation = fin;
+                    }
+                }
+                let fin = start + (start - transform.translation);
+            };
         }
     } else {
         warn!("Primary window not found for `player_move`!");
@@ -223,7 +264,7 @@ fn noclip_move(
             let right = Vec3::new(local_z.z, 0., -local_z.x);
 
             for key in keys.get_pressed() {
-                match window.cursor.grab_mode {
+                match window.cursor_options.grab_mode {
                     CursorGrabMode::None => (),
                     _ => {
                         let key = *key;
@@ -232,7 +273,7 @@ fn noclip_move(
                         } else if key == key_bindings.move_backward {
                             velocity -= forward;
                         } else if key == key_bindings.move_left {
-                            velocity -= right; 
+                            velocity -= right;
                         } else if key == key_bindings.move_right {
                             velocity += right;
                         } else if key == key_bindings.move_ascend {
@@ -243,7 +284,7 @@ fn noclip_move(
                     }
                 }
 
-                transform.translation += velocity * time.delta_seconds() * settings.speed
+                transform.translation += velocity * time.delta_secs() * settings.speed
             }
         }
     } else {
@@ -255,26 +296,16 @@ fn player_laser(
     click: Res<ButtonInput<MouseButton>>,
     players: Query<&PlayerCamera, With<Player>>,
     cameras: Query<&GlobalTransform, With<Camera>>,
-    context: Res<RapierContext>,
     map: Res<Map>,
     mut gizmos: Gizmos,
     selected: Res<SelectedBlock>,
+    mut error: Local<bool>,
 ) {
     for player in &players {
-        let Ok(camera) = cameras.get(player.0) else {
-            warn!("Player has not camera");
-            continue;
-        };
-        if let Some((_, toi)) = context.cast_ray(camera.translation(), camera.forward().as_vec3(), 5., true, QueryFilter::only_fixed()) {
-            let block = BlockId::from_translation(camera.translation() + (camera.forward() * (toi + 0.01)));
-            gizmos.cuboid(Transform::from_translation(block.to_vec3()), BLUE);
-            if click.just_pressed(MouseButton::Left) {
-                map.set_block(block, selected.0);
-            } else if click.just_pressed(MouseButton::Right) {
-                let block = BlockId::from_translation(camera.translation() + (camera.forward() * (toi - 0.01)));
-                map.set_block(block, selected.0);
-            }
-        }        
+        if !*error {
+            error!("add back raycast");
+            *error = true;
+        }
     }
 }
 
@@ -315,4 +346,90 @@ fn set_selected(
             selected.set(BlockType::from_repr(next).expect("next to be 0..BlockType::COUNT"))
         }
     }
+}
+
+fn gravity(map: Res<Map>, mut players: Query<&mut Transform, With<Player>>, time: Res<Time>) {
+    let mut player = players.single_mut();
+    let next = player.translation + (Vec3::Y * -9.8 * time.delta_secs());
+    if !map.get_block(BlockId::from_translation(next)).is_solid() {
+        player.translation = next;
+    };
+}
+fn render_gravity(
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    primary_window: Query<&Window, With<PrimaryWindow>>,
+    settings: Res<MovementSettings>,
+    key_bindings: Res<KeyBindings>,
+    mut query: Query<(&mut ExternalImpulse, &mut Transform), With<Player>>,
+    map: Res<Map>,
+    mut gizmos: Gizmos,
+) {
+    if let Ok(window) = primary_window.get_single() {
+        for (mut impulse, mut transform) in query.iter_mut() {
+            let mut velocity = Vec3::ZERO;
+            let local_z = transform.local_z();
+            let forward = -Vec3::new(local_z.x, 0., local_z.z);
+            let right = Vec3::new(local_z.z, 0., -local_z.x);
+
+            for key in keys.get_pressed() {
+                match window.cursor_options.grab_mode {
+                    CursorGrabMode::None => (),
+                    _ => {
+                        let key = *key;
+                        if key == key_bindings.move_forward {
+                            velocity += forward;
+                        } else if key == key_bindings.move_backward {
+                            velocity -= forward;
+                        } else if key == key_bindings.move_left {
+                            velocity -= right;
+                        } else if key == key_bindings.move_right {
+                            velocity += right;
+                        } else if key == key_bindings.move_ascend {
+                            velocity += Vec3::Y * 10.;
+                        } else if key == key_bindings.move_descend {
+                            velocity -= Vec3::Y * 10.;
+                        }
+                    }
+                }
+            }
+
+            let next = transform.translation + velocity * time.delta_secs() * settings.speed;
+            if !map.get_block(BlockId::from_translation(next)).is_solid() {
+                gizmos.line(
+                    transform.translation,
+                    transform.translation + velocity * settings.speed,
+                    Color::srgb(1., 0., 0.),
+                );
+            } else {
+                let end = transform.translation + velocity * settings.speed * time.delta_secs();
+                gizmos.line(transform.translation, end, Color::srgb(1., 0., 0.));
+                let hit = BlockId::from_translation(next).as_vec3();
+                let current = BlockId::from_translation(transform.translation).as_vec3();
+                let mut trans = Transform::from_translation(end);
+                let mut start = end;
+                let dif = hit - current;
+                if dif.x != 0. {
+                    start.x = transform.translation.x;
+                    let fin = start + (start - transform.translation);
+                    gizmos.line(end, fin, Color::srgb(0., 1., 0.));
+                }
+
+                if dif.z != 0. {
+                    start.z = transform.translation.z;
+                    let fin = start + (start - transform.translation);
+                    gizmos.line(end, fin, Color::srgb(0., 1., 0.));
+                }
+            };
+        }
+    } else {
+        warn!("Primary window not found for `player_move`!");
+    }
+}
+
+fn render_player_collider(mut gizmos: Gizmos, players: Query<&Transform, With<Player>>) {
+    let player = players.single();
+    let mut t = player.with_scale(Vec3::new(1., 2., 1.));
+    t.translation.y += 1.;
+    gizmos.cuboid(t, Color::srgb(1., 0., 1.));
 }

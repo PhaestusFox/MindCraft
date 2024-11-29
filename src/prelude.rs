@@ -1,11 +1,11 @@
 pub use crate::blocks::BlockType;
 pub const CHUNK_SIZE: i32 = 16;
 pub const CHUNK_AREA: i32 = CHUNK_SIZE * CHUNK_SIZE;
-pub const CHUNK_VOL: i32 = CHUNK_AREA * CHUNK_SIZE;
+pub const CHUNK_VOLUME: i32 = CHUNK_AREA * CHUNK_SIZE;
 pub const JIGGLE: f64 = std::f64::consts::PI - 3.;
 pub type BIN_REP_FACE = u16;
 pub const GROUND_HEIGHT: f64 = 64.;
 pub const WATER_LEVEL: i32 = 16;
-pub use crate::textures::TextureHandles;
+pub use crate::blocks::Direction;
 pub use crate::components::{BlockId, ChunkId};
-pub use crate::world::chunk::Direction;
+pub use crate::textures::TextureHandles;
