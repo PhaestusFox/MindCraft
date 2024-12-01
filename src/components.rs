@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::hash::Hasher;
+use std::ops::Sub;
 
 use bevy::prelude::*;
 
@@ -142,7 +143,7 @@ impl PartialOrd<i32> for ChunkId {
     }
 }
 
-#[derive(Component, Clone, Copy, Deref)]
+#[derive(Component, Clone, Copy, Deref, PartialEq, Eq)]
 pub struct BlockId(IVec3);
 
 impl BlockId {
@@ -183,6 +184,14 @@ impl BlockId {
             Direction::Forward => BlockId::new(self.x(), self.y(), self.z() + 1),
             Direction::Back => BlockId::new(self.x(), self.y(), self.z() - 1),
         }
+    }
+}
+
+impl Sub for BlockId {
+    type Output = BlockId;
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        self.0 -= rhs.0;
+        self
     }
 }
 

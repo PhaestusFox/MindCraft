@@ -1,7 +1,7 @@
 use avian3d::prelude::*;
 use bevy::{
     color::palettes::css::BLUE,
-    input::mouse::{MouseMotion, MouseWheel},
+    input::mouse::{AccumulatedMouseMotion, MouseMotion, MouseWheel},
     prelude::*,
     window::{CursorGrabMode, PrimaryWindow},
 };
@@ -9,6 +9,7 @@ use strum::EnumCount;
 
 use crate::{
     cam::{KeyBindings, MovementSettings},
+    physics::PhysicsObject,
     prelude::{BlockId, BlockType, ChunkId, CHUNK_SIZE, GROUND_HEIGHT},
     terrain::Map,
     GameState, Playing,
@@ -25,7 +26,7 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems(
                 Update,
-                (render_gravity, player_move)
+                player_move
                     .chain()
                     .in_set(Playing)
                     .run_if(in_state(PlayerMode::Normal)),
@@ -37,10 +38,7 @@ impl Plugin for PlayerPlugin {
                     .run_if(in_state(PlayerMode::NoClip)),
             )
             .init_resource::<SelectedBlock>()
-            .init_state::<PlayerMode>()
-            .add_systems(Update, gravity);
-        #[cfg(debug_assertions)]
-        app.add_systems(Update, (render_player_collider));
+            .init_state::<PlayerMode>();
     }
 }
 
@@ -76,10 +74,17 @@ fn noclip(
 }
 
 #[derive(Component)]
+#[require(PhysicsObject)]
 pub struct Player;
 
-#[derive(Component)]
-struct PlayerCamera(Entity);
+#[derive(Component, Deref)]
+pub struct PlayerCamera(Entity);
+
+impl PlayerCamera {
+    pub fn get(&self) -> Entity {
+        self.0
+    }
+}
 
 #[derive(Resource, Default)]
 pub struct SelectedBlock(BlockType);
@@ -102,10 +107,10 @@ impl std::fmt::Display for SelectedBlock {
 
 pub fn spawn_player(mut commands: Commands) {
     let cam = commands
-        .spawn(Camera3dBundle {
-            transform: Transform::from_translation(Vec3::new(0., 1.75, 0.)),
-            ..Default::default()
-        })
+        .spawn((
+            Camera3d::default(),
+            Transform::from_translation(Vec3::new(0., 1.75, 0.)),
+        ))
         .id();
 
     commands
@@ -114,10 +119,7 @@ pub fn spawn_player(mut commands: Commands) {
             Player,
             ExternalImpulse::default(),
             LockedAxes::ROTATION_LOCKED,
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
-                ..Default::default()
-            },
+            Transform::from_translation(Vec3::new(0., GROUND_HEIGHT as f32, 0.)),
             AngularDamping(1.),
             LinearDamping(0.5),
             PlayerCamera(cam),
@@ -125,10 +127,8 @@ pub fn spawn_player(mut commands: Commands) {
         .with_children(|p| {
             p.spawn((
                 Collider::capsule(0.4, 1.),
-                SpatialBundle {
-                    transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-                    ..Default::default()
-                },
+                Transform::default(),
+                Visibility::default(),
             ));
         })
         .add_child(cam);
@@ -138,10 +138,9 @@ pub fn spawn_player(mut commands: Commands) {
 fn player_look(
     settings: Res<MovementSettings>,
     primary_window: Query<&Window, With<PrimaryWindow>>,
-    mut state: EventReader<MouseMotion>,
+    mouse_motion: Res<AccumulatedMouseMotion>,
     mut query: Query<(&mut Transform, &PlayerCamera), With<Player>>,
     mut cams: Query<&mut Transform, (Without<Player>, With<Camera>)>,
-    gravity: Res<Gravity>,
 ) {
     if let Ok(window) = primary_window.get_single() {
         for (mut transform, player_camera) in query.iter_mut() {
@@ -150,8 +149,7 @@ fn player_look(
                 continue;
             };
             let (_, mut pitch, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
-            let delta: Vec2 = state.read().map(|d| d.delta).sum();
-            if delta.length() < 0.1 {
+            if mouse_motion.delta.length_squared() < 0.1 {
                 return;
             }
             let (mut yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
@@ -160,8 +158,10 @@ fn player_look(
                 _ => {
                     // Using smallest of height or width ensures equal vertical and horizontal sensitivity
                     let window_scale = window.height().min(window.width());
-                    pitch -= (settings.sensitivity * delta.y * window_scale).to_radians();
-                    yaw -= (settings.sensitivity * delta.x * window_scale).to_radians();
+                    pitch -=
+                        (settings.sensitivity * mouse_motion.delta.y * window_scale).to_radians();
+                    yaw -=
+                        (settings.sensitivity * mouse_motion.delta.x * window_scale).to_radians();
                 }
             }
             pitch = pitch.clamp(-1.57, 1.57);
@@ -182,11 +182,11 @@ fn player_move(
     primary_window: Query<&Window, With<PrimaryWindow>>,
     settings: Res<MovementSettings>,
     key_bindings: Res<KeyBindings>,
-    mut query: Query<(&mut ExternalImpulse, &mut Transform), With<Player>>,
+    mut query: Query<(&mut Transform), With<Player>>,
     map: Res<Map>,
 ) {
     if let Ok(window) = primary_window.get_single() {
-        for (mut impulse, mut transform) in query.iter_mut() {
+        for (mut transform) in query.iter_mut() {
             let mut velocity = Vec3::ZERO;
             let local_z = transform.local_z();
             let forward = -Vec3::new(local_z.x, 0., local_z.z);
@@ -221,7 +221,6 @@ fn player_move(
                 let end = transform.translation + velocity * settings.speed * time.delta_secs();
                 let hit = BlockId::from_translation(next).as_vec3();
                 let current = BlockId::from_translation(transform.translation).as_vec3();
-                let mut trans = Transform::from_translation(end);
                 let mut start = end;
                 let dif = hit - current;
                 if dif.x != 0. {
@@ -239,7 +238,6 @@ fn player_move(
                         transform.translation = fin;
                     }
                 }
-                let fin = start + (start - transform.translation);
             };
         }
     } else {
@@ -346,90 +344,4 @@ fn set_selected(
             selected.set(BlockType::from_repr(next).expect("next to be 0..BlockType::COUNT"))
         }
     }
-}
-
-fn gravity(map: Res<Map>, mut players: Query<&mut Transform, With<Player>>, time: Res<Time>) {
-    let mut player = players.single_mut();
-    let next = player.translation + (Vec3::Y * -9.8 * time.delta_secs());
-    if !map.get_block(BlockId::from_translation(next)).is_solid() {
-        player.translation = next;
-    };
-}
-fn render_gravity(
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    settings: Res<MovementSettings>,
-    key_bindings: Res<KeyBindings>,
-    mut query: Query<(&mut ExternalImpulse, &mut Transform), With<Player>>,
-    map: Res<Map>,
-    mut gizmos: Gizmos,
-) {
-    if let Ok(window) = primary_window.get_single() {
-        for (mut impulse, mut transform) in query.iter_mut() {
-            let mut velocity = Vec3::ZERO;
-            let local_z = transform.local_z();
-            let forward = -Vec3::new(local_z.x, 0., local_z.z);
-            let right = Vec3::new(local_z.z, 0., -local_z.x);
-
-            for key in keys.get_pressed() {
-                match window.cursor_options.grab_mode {
-                    CursorGrabMode::None => (),
-                    _ => {
-                        let key = *key;
-                        if key == key_bindings.move_forward {
-                            velocity += forward;
-                        } else if key == key_bindings.move_backward {
-                            velocity -= forward;
-                        } else if key == key_bindings.move_left {
-                            velocity -= right;
-                        } else if key == key_bindings.move_right {
-                            velocity += right;
-                        } else if key == key_bindings.move_ascend {
-                            velocity += Vec3::Y * 10.;
-                        } else if key == key_bindings.move_descend {
-                            velocity -= Vec3::Y * 10.;
-                        }
-                    }
-                }
-            }
-
-            let next = transform.translation + velocity * time.delta_secs() * settings.speed;
-            if !map.get_block(BlockId::from_translation(next)).is_solid() {
-                gizmos.line(
-                    transform.translation,
-                    transform.translation + velocity * settings.speed,
-                    Color::srgb(1., 0., 0.),
-                );
-            } else {
-                let end = transform.translation + velocity * settings.speed * time.delta_secs();
-                gizmos.line(transform.translation, end, Color::srgb(1., 0., 0.));
-                let hit = BlockId::from_translation(next).as_vec3();
-                let current = BlockId::from_translation(transform.translation).as_vec3();
-                let mut trans = Transform::from_translation(end);
-                let mut start = end;
-                let dif = hit - current;
-                if dif.x != 0. {
-                    start.x = transform.translation.x;
-                    let fin = start + (start - transform.translation);
-                    gizmos.line(end, fin, Color::srgb(0., 1., 0.));
-                }
-
-                if dif.z != 0. {
-                    start.z = transform.translation.z;
-                    let fin = start + (start - transform.translation);
-                    gizmos.line(end, fin, Color::srgb(0., 1., 0.));
-                }
-            };
-        }
-    } else {
-        warn!("Primary window not found for `player_move`!");
-    }
-}
-
-fn render_player_collider(mut gizmos: Gizmos, players: Query<&Transform, With<Player>>) {
-    let player = players.single();
-    let mut t = player.with_scale(Vec3::new(1., 2., 1.));
-    t.translation.y += 1.;
-    gizmos.cuboid(t, Color::srgb(1., 0., 1.));
 }

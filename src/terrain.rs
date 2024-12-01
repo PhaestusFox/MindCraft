@@ -221,7 +221,6 @@ fn start_mesh_chunks(mut map: ResMut<Map>, text_atlas: Res<TextureHandles>) {
         .collect::<Vec<_>>();
     let mut tasks = std::mem::take(&mut map.mesh_task);
     for (id, target) in ready {
-        println!("starting meshing of {:?}", id);
         map.id_to_entity.insert(id, target);
         map.to_mesh.remove(&id);
         tasks.insert(
@@ -241,15 +240,14 @@ fn finish_mesh_chunks(
     mut map: ResMut<Map>,
     asset_server: Res<AssetServer>,
 ) {
-    let mut finished = map
+    let finished = map
         .mesh_task
         .iter()
-        .filter(|(&k, &ref v)| v.is_finished())
+        .filter(|(_, &ref v)| v.is_finished())
         .map(|(k, _)| *k)
         .collect::<Vec<_>>();
     for id in finished {
         let task = map.mesh_task.remove(&id).unwrap();
-        info!("mesh for {} done", id);
         let mesh = match futures_lite::future::block_on(task.cancel()).expect("Is finished") {
             Ok(chunk) => chunk,
             Err(e) => {
@@ -285,21 +283,17 @@ fn spawn_visable_chunks(
             if map.get_entity(&pos).is_some() || map.to_mesh.contains_key(&pos) {
                 continue;
             }
-            println!("add to spawn chunk");
             for y in 0..5 {
                 let pos = ChunkId::new(center.x() + x, y, center.z() + z);
                 let entity = commands
                     .spawn((
-                        PbrBundle {
-                            transform: Transform::from_translation(Vec3::new(
-                                (pos.x() * CHUNK_SIZE) as f32,
-                                (pos.y() * CHUNK_SIZE) as f32,
-                                (pos.z() * CHUNK_SIZE) as f32,
-                            )),
-                            material: MeshMaterial3d(matt.get_atlas()),
-                            mesh: Mesh3d(Handle::weak_from_u128(pos.to_u128())),
-                            ..Default::default()
-                        },
+                        Transform::from_translation(Vec3::new(
+                            (pos.x() * CHUNK_SIZE) as f32,
+                            (pos.y() * CHUNK_SIZE) as f32,
+                            (pos.z() * CHUNK_SIZE) as f32,
+                        )),
+                        MeshMaterial3d(matt.get_atlas()),
+                        Mesh3d(Handle::weak_from_u128(pos.to_u128())),
                         pos,
                     ))
                     .id();

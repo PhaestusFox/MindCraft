@@ -25,9 +25,15 @@ mod terrain;
 
 mod components;
 
+mod physics;
+
 fn main() {
     let mut app = App::new();
-    app.add_plugins((DefaultPlugins, PhysicsPlugins::default()));
+    app.add_plugins((
+        DefaultPlugins,
+        PhysicsPlugins::default(),
+        physics::PhysicsPlugin,
+    ));
     #[cfg(debug_assertions)]
     app.add_systems(Update, frame_time);
     #[cfg(debug_assertions)]
@@ -55,15 +61,14 @@ fn main() {
 }
 
 fn spawn_cube(mut commands: Commands, mut mesh: ResMut<Assets<Mesh>>, atlas: Res<TextureHandles>) {
-    commands.spawn(DirectionalLightBundle {
-        transform: Transform::from_translation(Vec3::new(0., 256., 0.))
-            .with_rotation(Quat::from_rotation_x(-0.3)),
-        directional_light: DirectionalLight {
-            // shadows_enabled: true,
+    commands.spawn((
+        DirectionalLight {
+            shadows_enabled: true,
             ..Default::default()
         },
-        ..Default::default()
-    });
+        Transform::from_translation(Vec3::new(0., 256., 0.))
+            .with_rotation(Quat::from_rotation_x(-0.3)),
+    ));
     commands.queue(textures::MakeTextureAtlas::new(
         [
             BlockType::Bedrock,
